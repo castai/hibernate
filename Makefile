@@ -1,6 +1,6 @@
 default: release
 
-APP="castai/hibernator"
+APP="castai/hibernate"
 TAG_LATEST=$(APP):latest
 
 gke:
@@ -13,7 +13,7 @@ pull:
 	docker pull $(TAG_LATEST)
 
 build:
-	@echo "==> Building hibernator container"
+	@echo "==> Building hibernate container"
 	docker build --cache-from $(TAG_LATEST) --platform linux/amd64 -t $(TAG_LATEST) .
 
 publish:

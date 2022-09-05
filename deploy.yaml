@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: castai-hibernator
+  name: castai-hibernate
   namespace: castai-agent
 type: Opaque
 data:
@@ -11,14 +11,14 @@ data:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: hibernater
+  name: hibernate
   namespace: castai-agent
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: castai-agent
-  name: hibernater
+  name: hibernate
 rules:
 - apiGroups: ["*"]
   resources: ["*"]
@@ -27,21 +27,21 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: hibernater
+  name: hibernate
   namespace: castai-agent
 subjects:
 - kind: ServiceAccount
-  name: hibernater
+  name: hibernate
   apiGroup: ""
 roleRef:
   kind: Role
-  name: hibernater
+  name: hibernate
   apiGroup: ""
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: hibernater
+  name: hibernate
 rules:
   - verbs:
       - get
@@ -92,23 +92,23 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: hibernater
+  name: hibernate
 subjects:
   - kind: ServiceAccount
-    name: hibernater
+    name: hibernate
     namespace: castai-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: hibernater
+  name: hibernate
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: hibernater-admin
+  name: hibernate-admin
 subjects:
   - kind: ServiceAccount
-    name: hibernater
+    name: hibernate
     namespace: castai-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -118,7 +118,7 @@ roleRef:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: hibernator-pause
+  name: hibernate-pause
   namespace: castai-agent
 spec:
   schedule: "0 22 * * 1-5"
@@ -130,14 +130,14 @@ spec:
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
             operator: Exists
-          serviceAccountName: hibernater
+          serviceAccountName: hibernate
           containers:
           - name: pauser
-            image: castai/hibernater:latest
+            image: castai/hibernate:latest
             imagePullPolicy: Always
             envFrom:
               - secretRef:
-                  name: castai-hibernator
+                  name: castai-hibernate
             env:
               - name: CLOUD
                 value: "AKS"
@@ -154,7 +154,7 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: hibernator-resume
+  name: hibernate-resume
   namespace: castai-agent
 spec:
   schedule: "0 7 * * 1-5"
@@ -166,14 +166,14 @@ spec:
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
             operator: Exists
-          serviceAccountName: hibernater
+          serviceAccountName: hibernate
           containers:
           - name: pauser
-            image: castai/hibernater:latest
+            image: castai/hibernate:latest
             imagePullPolicy: Always
             envFrom:
               - secretRef:
-                  name: castai-hibernator
+                  name: castai-hibernate
             env:
               - name: CLOUD
                 value: "AKS"
