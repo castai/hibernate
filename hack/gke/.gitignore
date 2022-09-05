@@ -1,0 +1,27 @@
+# Terraform files
+terraform.tfstate
+terraform.tfvars
+*.tfstate*
+.terraform/
+.terraform.lock.hcl
+terraform-provider*
+plan
+ansible/hosts
+ansible/buffer
+gce.conf
+
+# IntelliJ files
+.DS_Store
+.idea_modules
+*.iml
+*.iws
+*.ipr
+.idea/
+build/
+*/build/
+
+
+# Credentials
+local.auto.tfvars
+
+

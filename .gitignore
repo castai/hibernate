@@ -1,0 +1,13 @@
+# Python files
+.env
+__pycache__
+
+# IntelliJ files
+.DS_Store
+.idea_modules
+*.iml
+*.iws
+*.ipr
+.idea/
+build/
+*/build/

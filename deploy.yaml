@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: castai-hibernator
+  namespace: castai-agent
+type: Opaque
+data:
+  API_KEY: >-
+    ND...==
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rapid-downscaler
+  namespace: castai-agent
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: castai-agent
+  name: rapid-downscaler
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rapid-downscaler
+  namespace: castai-agent
+subjects:
+- kind: ServiceAccount
+  name: rapid-downscaler
+  apiGroup: ""
+roleRef:
+  kind: Role
+  name: rapid-downscaler
+  apiGroup: ""
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rapid-downscaler
+rules:
+  - verbs:
+      - get
+      - list
+      - patch
+    apiGroups:
+      - ''
+    resources:
+      - nodes
+  - verbs:
+      - get
+    apiGroups:
+      - ''
+    resources:
+      - namespaces
+  - verbs:
+      - get
+      - list
+      - delete
+      - create
+      - watch
+    apiGroups:
+      - ''
+    resources:
+      - events
+  - verbs:
+      - get
+      - patch
+      - update
+      - delete
+      - escalate
+    apiGroups:
+      - ''
+    resources:
+      - namespaces
+    resourceNames:
+      - castai-agent
+      - kube-system
+  - verbs:
+      - get
+      - list
+      - patch
+    apiGroups:
+      - "apps"
+    resources:
+      - deployments
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rapid-downscaler
+subjects:
+  - kind: ServiceAccount
+    name: rapid-downscaler
+    namespace: castai-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rapid-downscaler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rapid-downscaler-admin
+subjects:
+  - kind: ServiceAccount
+    name: rapid-downscaler
+    namespace: castai-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hibernator-pause
+  namespace: castai-agent
+spec:
+  schedule: "0 22 * * 1-5"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "scheduling.cast.ai/paused-cluster"
+            operator: Exists
+          serviceAccountName: rapid-downscaler
+          containers:
+          - name: pauser
+            image: castai/rapid-downscaler:latest
+            imagePullPolicy: Always
+            envFrom:
+              - secretRef:
+                  name: castai-hibernator
+            env:
+              - name: CLOUD
+                value: "AKS"
+              - name: ACTION
+                value: "pause"
+              - name: CLUSTER_ID
+                valueFrom:
+                  configMapKeyRef:
+                    name: castai-cluster-controller
+                    key: CLUSTER_ID
+          restartPolicy: Never
+      backoffLimit: 1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hibernator-resume
+  namespace: castai-agent
+spec:
+  schedule: "0 7 * * 1-5"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          tolerations:
+          - key: "scheduling.cast.ai/paused-cluster"
+            operator: Exists
+          serviceAccountName: rapid-downscaler
+          containers:
+          - name: pauser
+            image: castai/rapid-downscaler:latest
+            imagePullPolicy: Always
+            envFrom:
+              - secretRef:
+                  name: castai-hibernator
+            env:
+              - name: CLOUD
+                value: "AKS"
+              - name: ACTION
+                value: "resume"
+              - name: CLUSTER_ID
+                valueFrom:
+                  configMapKeyRef:
+                    name: castai-cluster-controller
+                    key: CLUSTER_ID
+          restartPolicy: Never
+      backoffLimit: 1
+---
