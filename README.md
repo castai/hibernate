@@ -1,10 +1,10 @@
-# Hibernator shrinks and expands your cluster on schedule
+# Hibernate shrinks and expands your cluster on schedule
 
 This utility currently is on best effort support by @Leon Kuperman and @Augustinas Stirbis through community slack
 
-Run this command to install Hibernator CronJobs
+Run this command to install Hibernate CronJobs
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/castai/hibernator/initial_branch/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/castai/Hibernate/initial_branch/deploy.yaml
 ```
 
 Create API token with Full Access permissions and encode base64
@@ -17,7 +17,7 @@ use this value to update Secret
 apiVersion: v1
 kind: Secret
 metadata:
-  name: castai-hibernator
+  name: castai-Hibernate
   namespace: castai-agent
 type: Opaque
 data:
@@ -28,13 +28,13 @@ data:
 
 ## How it works
 
-hibernator-pause Job will 
+Hibernate-pause Job will 
  - Disable Unscheduled Pod Policy (to prevent growing cluster)
  - Prepare Hibernation node (node that will stay hosting essential components)
  - Mark essential Deployments with Hibernation toleration
  - Delete all other nodes (only hibernation node should stay running)
 
-hibernator-resume Job will
+Hibernate-resume Job will
  - Renable Unscheduled Pod Policy to allow cluster to expand to needed size
 
 ## TODO
