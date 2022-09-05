@@ -11,14 +11,14 @@ data:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: rapid-downscaler
+  name: hibernater
   namespace: castai-agent
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   namespace: castai-agent
-  name: rapid-downscaler
+  name: hibernater
 rules:
 - apiGroups: ["*"]
   resources: ["*"]
@@ -27,21 +27,21 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: rapid-downscaler
+  name: hibernater
   namespace: castai-agent
 subjects:
 - kind: ServiceAccount
-  name: rapid-downscaler
+  name: hibernater
   apiGroup: ""
 roleRef:
   kind: Role
-  name: rapid-downscaler
+  name: hibernater
   apiGroup: ""
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rapid-downscaler
+  name: hibernater
 rules:
   - verbs:
       - get
@@ -92,23 +92,23 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: rapid-downscaler
+  name: hibernater
 subjects:
   - kind: ServiceAccount
-    name: rapid-downscaler
+    name: hibernater
     namespace: castai-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rapid-downscaler
+  name: hibernater
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: rapid-downscaler-admin
+  name: hibernater-admin
 subjects:
   - kind: ServiceAccount
-    name: rapid-downscaler
+    name: hibernater
     namespace: castai-agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -130,10 +130,10 @@ spec:
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
             operator: Exists
-          serviceAccountName: rapid-downscaler
+          serviceAccountName: hibernater
           containers:
           - name: pauser
-            image: castai/rapid-downscaler:latest
+            image: castai/hibernater:latest
             imagePullPolicy: Always
             envFrom:
               - secretRef:
@@ -166,10 +166,10 @@ spec:
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
             operator: Exists
-          serviceAccountName: rapid-downscaler
+          serviceAccountName: hibernater
           containers:
           - name: pauser
-            image: castai/rapid-downscaler:latest
+            image: castai/hibernater:latest
             imagePullPolicy: Always
             envFrom:
               - secretRef:
