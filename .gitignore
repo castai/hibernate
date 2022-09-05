@@ -1,6 +1,7 @@
 # Python files
 .env
 __pycache__
+local.py
 
 # IntelliJ files
 .DS_Store

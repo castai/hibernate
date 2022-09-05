@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "shrink-k8s"
+name = "hibernate"
 version = "0.1.0"
 description = ""
-authors = ["Augustinas Stirbis <49340408+AugustinasS@users.noreply.github.com>"]
+authors = ["Leon Kuperman", "Augustinas Stirbis"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
