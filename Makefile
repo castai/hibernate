@@ -7,7 +7,13 @@ gke:
 	(cd ./hack/gke && terraform init && terraform apply -auto-approve)
 
 eks:
-	(cd ./hack/gke && terraform init && terraform apply -target module.vpc -auto-approve && terraform apply -target module.eks -auto-approve && terraform apply -auto-approve)
+	(cd ./hack/eks && terraform init && terraform apply -target module.vpc -auto-approve && terraform apply -target module.eks -auto-approve && terraform apply -auto-approve)
+
+aks:
+	(cd ./hack/aks && terraform init && terraform apply -auto-approve)
+
+kind:
+	(cd ./hack/kind && sh run.sh)
 
 pull:
 	docker pull $(TAG_LATEST)

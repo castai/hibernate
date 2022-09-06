@@ -1,3 +1,4 @@
+import logging
 import time
 from requests import Session
 
@@ -21,8 +22,8 @@ def set_unschedulable_pod_policy_enabled(cluster_id: str, castai_api_token: str,
             raise NetworkError('Failed to get original policies') from e
 
         if updated_policies_body['unschedulablePods']["enabled"] != policy_value:
-            print("Update policy. mismatch:")
-            print(f'Current: {updated_policies_body["unschedulablePods"]["enabled"]}  Future: {policy_value}')
+            logging.info("Update policy. mismatch:")
+            logging.info(f'Current: {updated_policies_body["unschedulablePods"]["enabled"]}  Future: {policy_value}')
 
             updated_policies_body['unschedulablePods']['enabled'] = policy_value
 
@@ -34,30 +35,34 @@ def set_unschedulable_pod_policy_enabled(cluster_id: str, castai_api_token: str,
                 raise NetworkError(f'Failed to update policies {policy_value}') from e
 
             if validate_policies['unschedulablePods']["enabled"] == policy_value:
-                print("Update completed")
+                logging.info("Update completed")
                 return True
             else:
-                print("Update failed")
+                logging.info("Update failed")
                 return False
         else:
-            print("skip policy update")
+            logging.info("skip policy update")
             return True
 
 
-def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, k8s_taint: str):
+def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, k8s_taint: str, cloud: str):
     """ Create Node with Taint that will stay running during hibernation"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
-    special_taint = [{
-        "effect": "NoSchedule",
-        "key": k8s_taint,
-        "value": "true"
-    }]
+
 
     new_node_body = {}
     new_node_body["instanceType"] = instance_type
-    new_node_body["kubernetesTaints"] = special_taint
+    if k8s_taint:
+        special_taint = [{
+            "effect": "NoSchedule",
+            "key": k8s_taint,
+            "value": "true"
+        }]
+        new_node_body["kubernetesTaints"] = special_taint
+    if cloud == "AKS":
+        new_node_body["kubernetesLabels"] = {"kubernetes.azure.com/mode": "system"}
 
     with Session() as session:
         try:
@@ -74,7 +79,7 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         done_node_creation = False
 
         while not done_node_creation:
-            print("checking node creation operation ID: ", ops_id)
+            logging.info("checking node creation operation ID: ", ops_id)
             try:
                 with session.get(url=urlOperations(ops_id), headers=header_dict) as operation:
                     operation.raise_for_status()
@@ -83,7 +88,7 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
                 raise NetworkError('Failed to get Operation status') from e
 
             if ops_response["done"]:
-                print("ops_response: %s" % ops_response)
+                logging.info("ops_response: %s" % ops_response)
                 break
             time.sleep(10)
         return nodeId
@@ -111,13 +116,13 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
         for node in node_list_result["items"]:
             # drain/delete each node
             if node["id"] == hibernation_node_id:
-                print("Skipping temp node: %s " % node["id"])
+                logging.info("Skipping temp node: %s " % node["id"])
             else:
-                print("Deleting: %s with id: %s" % (node["name"], node["id"]))
+                logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
                 try:
                     with session.delete(url=urlDelete(cluster_id, node["id"]), headers=header_dict, params=paramsDelete) as deleteresp:
                         deleteresp.raise_for_status()
                         delete_node_result = deleteresp.json()
-                        print(delete_node_result)
+                        logging.info(delete_node_result)
                 except Exception as e:
                     raise NetworkError(f'Failed to delete node {delete_node_result}') from e
