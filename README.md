@@ -4,12 +4,12 @@ This utility currently is on best effort support by @Leon Kuperman and @Augustin
 
 Run this command to install Hibernate CronJobs
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/castai/Hibernate/initial_branch/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/castai/hibernate/main/deploy.yaml
 ```
 
 Create API token with Full Access permissions and encode base64
 ```shell
-echo "98349587234524jh523452435kj2h4k5h2k34j5h2kj34h5k23h5k2345jhk2" | base64
+echo -n "98349587234524jh523452435kj2h4k5h2k34j5h2kj34h5k23h5k2345jhk2" | base64
 ```
 
 use this value to update Secret
@@ -22,7 +22,7 @@ metadata:
 type: Opaque
 data:
   API_KEY: >-
-    API-key-REPLACE-ME-WITH-ABOVE...==
+    CASTAI-API-KEY-REPLACE-ME-WITH-ABOVE==
 ```
  
 

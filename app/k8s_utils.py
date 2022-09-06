@@ -63,7 +63,8 @@ def add_special_tolerations(client, namespace: str, toleration: str):
         try:
             patch_result = client.patch_namespaced_deployment(deployment_name, namespace, restart_body)
         except ApiException as e:
-            raise K8sAPIError(f'Exception when calling AppsV1Api->patch_namespaced_deployment: {deployment_name}') from e
+            raise K8sAPIError(
+                f'Exception when calling AppsV1Api->patch_namespaced_deployment: {deployment_name}') from e
 
         if patch_result:
             logging.info("Patch complete...")
@@ -81,7 +82,7 @@ def hibernation_node_already_exist(client, taint: str, k8s_label: str):
 
 
 def azure_system_node(client, k8s_label: str, taint: str):
-    """ mark existing AKS system node with hibernation Taint"""
+    """ mark existing AKS system node with hibernation Taint if small system node is found"""
 
     node_list = client.list_node(label_selector=k8s_label)
     hibernation_node = None
@@ -94,7 +95,7 @@ def azure_system_node(client, k8s_label: str, taint: str):
                 break
 
     if hibernation_node:
-        taint_to_add = { "key": taint, "effect": "NoSchedule"}
+        taint_to_add = {"key": taint, "effect": "NoSchedule"}
         logging.info("found single system nodes, will add taint")
 
         current_taints = hibernation_node.spec.taints
@@ -111,7 +112,7 @@ def azure_system_node(client, k8s_label: str, taint: str):
         logging.info("patching node %s with taint", hibernation_node.metadata.name)
         patch_result = None
         try:
-            patch_result = client.patch_node(hibernation_node.metadata.name,taint_body)
+            patch_result = client.patch_node(hibernation_node.metadata.name, taint_body)
         except ApiException as e:
             raise K8sAPIError(f'Failed to taint node {hibernation_node.metadata.name}') from e
 

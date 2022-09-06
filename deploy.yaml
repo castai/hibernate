@@ -6,7 +6,7 @@ metadata:
 type: Opaque
 data:
   API_KEY: >-
-    ND...==
+    Q0FTVEFJLUFQSS1LRVktUkVQTEFDRS1NRS1XSVRILUFCT1ZFLg==
 ---
 apiVersion: v1
 kind: ServiceAccount

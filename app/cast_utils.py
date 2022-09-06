@@ -23,7 +23,7 @@ def set_unschedulable_pod_policy_enabled(cluster_id: str, castai_api_token: str,
 
         if updated_policies_body['unschedulablePods']["enabled"] != policy_value:
             logging.info("Update policy. mismatch:")
-            logging.info(f'Current: {updated_policies_body["unschedulablePods"]["enabled"]}  Future: {policy_value}')
+            print(f'Current: {updated_policies_body["unschedulablePods"]["enabled"]}  Future: {policy_value}')
 
             updated_policies_body['unschedulablePods']['enabled'] = policy_value
 
@@ -51,7 +51,6 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-
     new_node_body = {}
     new_node_body["instanceType"] = instance_type
     if k8s_taint:
@@ -62,7 +61,16 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         }]
         new_node_body["kubernetesTaints"] = special_taint
     if cloud == "AKS":
-        new_node_body["kubernetesLabels"] = {"kubernetes.azure.com/mode": "system"}
+        new_node_body["kubernetesLabels"] = {
+            "kubernetes.azure.com/mode": "system",
+            "scheduling.cast.ai/spot-fallback": "true",
+            "scheduling.cast.ai/spot": "true"
+        }
+    else:
+        new_node_body["kubernetesLabels"] = {
+            "scheduling.cast.ai/spot-fallback": "true",
+            "scheduling.cast.ai/spot": "true"
+        }
 
     with Session() as session:
         try:
@@ -73,13 +81,13 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
             raise NetworkError(f'Failed to add node {add_node_result}') from e
 
         # wait for new node to be created, listen to operation
-        ops_id = add_node_result ["operationId"]
+        ops_id = add_node_result["operationId"]
         nodeId = add_node_result["nodeId"]
         urlOperations = "https://api.cast.ai/v1/kubernetes/external-clusters/operations/{}".format
         done_node_creation = False
 
         while not done_node_creation:
-            logging.info("checking node creation operation ID: ", ops_id)
+            logging.info("checking node creation operation ID: %s", ops_id)
             try:
                 with session.get(url=urlOperations(ops_id), headers=header_dict) as operation:
                     operation.raise_for_status()
@@ -111,7 +119,7 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
         urlDelete = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
         paramsDelete = {
             "forceDelete": True,
-            "drainTimeout":  30
+            "drainTimeout": 30
         }
         for node in node_list_result["items"]:
             # drain/delete each node
@@ -120,7 +128,8 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
             else:
                 logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
                 try:
-                    with session.delete(url=urlDelete(cluster_id, node["id"]), headers=header_dict, params=paramsDelete) as deleteresp:
+                    with session.delete(url=urlDelete(cluster_id, node["id"]), headers=header_dict,
+                                        params=paramsDelete) as deleteresp:
                         deleteresp.raise_for_status()
                         delete_node_result = deleteresp.json()
                         logging.info(delete_node_result)

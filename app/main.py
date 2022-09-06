@@ -11,6 +11,7 @@ logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
 azure_system_node_label = "kubernetes.azure.com/mode=system"
+spot_fallback = "scheduling.cast.ai/spot-fallback"
 cast_nodeID_label = "provisioner.cast.ai/node-id"
 cast_namespace = "castai-agent"
 kube_system_namespace = "kube-system"
@@ -57,6 +58,7 @@ if __name__ == '__main__':
             hibernation_node_id = azure_system_node(k8s_v1, k8s_label=azure_system_node_label,
                                                     taint=castai_pause_toleration)
             if not hibernation_node_id:
+                logging.info("No suitable AKS system nodes were found for tainting, creating new small node")
                 hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token,
                                                               instance_type=instance_type[cloud],
                                                               k8s_taint=castai_pause_toleration, cloud=cloud)
