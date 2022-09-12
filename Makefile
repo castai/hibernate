@@ -2,6 +2,7 @@ default: release
 
 APP="castai/hibernate"
 TAG_LATEST=$(APP):latest
+#TAG_LATEST=$(APP):test1
 
 gke:
 	(cd ./hack/gke && terraform init && terraform apply -auto-approve)

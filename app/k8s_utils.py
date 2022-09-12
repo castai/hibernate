@@ -12,7 +12,8 @@ def cordon_all_nodes(client, exclude_node_id: str):
 
     node_body = {
         "spec": {
-            "unschedulable": True
+            "unschedulable": True,
+            "taints": [{"key": "scheduling.cast.ai/hibernate", "effect": "NoExecute"}]
         }
     }
 
@@ -41,8 +42,6 @@ def add_special_tolerations(client, namespace: str, toleration: str):
     for deployment in cast_deployment_list.items:
         deployment_name = deployment.metadata.name
         logging.info("Patching and restarting: %s" % deployment_name)
-
-        # current_deployment = client.read_namespaced_deployment(deployment_name, namespace)
         current_tolerations = deployment.spec.template.spec.tolerations
 
         if current_tolerations is None:
@@ -106,6 +105,13 @@ def azure_system_node(client, k8s_label: str, taint: str):
         taint_body = {
             "spec": {
                 "taints": current_taints
+            },
+            "metadata": {
+                "labels": {
+                    "scheduling.cast.ai/paused-cluster": "true",
+                    "scheduling.cast.ai/spot-fallback": "true",
+                    "scheduling.cast.ai/spot": "true"
+                }
             }
         }
 
