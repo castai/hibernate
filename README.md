@@ -38,5 +38,4 @@ Hibernate-resume Job will
  - Renable Unscheduled Pod Policy to allow cluster to expand to needed size
 
 ## TODO
- - Adjust AKS system node size if too big
  - Auto detect Cloud 
