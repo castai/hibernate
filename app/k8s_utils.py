@@ -20,7 +20,7 @@ def cordon_all_nodes(client, exclude_node_id: str):
     node_list = client.list_node()
     for node in node_list.items:
         logging.info("Inspecting node %s to cordon", node.metadata.name)
-        if node.metadata.labels["provisioner.cast.ai/node-id"] != exclude_node_id:
+        if node.metadata.labels.get("provisioner.cast.ai/node-id") != exclude_node_id:
             logging.info("Cordoning: %s" % node.metadata.name)
             client.patch_node(node.metadata.name, node_body)
         else:
@@ -77,7 +77,7 @@ def hibernation_node_already_exist(client, taint: str, k8s_label: str):
             for current_taint in node.spec.taints:
                 if current_taint.to_dict()["key"] == taint:
                     logging.info("found hibernation compatible node with label %s and taint %s", k8s_label, taint)
-                    return node.metadata.labels["provisioner.cast.ai/node-id"]
+                    return node.metadata.labels.get("provisioner.cast.ai/node-id")
 
 
 def azure_system_node(client, k8s_label: str, taint: str):
