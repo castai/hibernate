@@ -107,7 +107,7 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
             if ops_response["done"]:
                 logging.info("ops_response: %s" % ops_response)
                 break
-            time.sleep(10)
+            time.sleep(60)
         return nodeId
 
 
@@ -128,7 +128,7 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
         urlDelete = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
         paramsDelete = {
             "forceDelete": True,
-            "drainTimeout": 30
+            "drainTimeout": 60
         }
         for node in node_list_result["items"]:
             # drain/delete each node
