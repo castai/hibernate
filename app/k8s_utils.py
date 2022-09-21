@@ -12,8 +12,7 @@ def cordon_all_nodes(client, exclude_node_id: str):
 
     node_body = {
         "spec": {
-            "unschedulable": True,
-            "taints": [{"key": "scheduling.cast.ai/hibernate", "effect": "NoExecute"}]
+            "unschedulable": True
         }
     }
 

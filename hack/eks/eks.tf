@@ -1,10 +1,10 @@
 #2. create EKS cluster
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "17.24.0"
+  version = "~> 18.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.21"
+  cluster_version = "1.23"
 
   vpc_id  = module.vpc.vpc_id
   subnets = [module.vpc.private_subnets[0], module.vpc.public_subnets[1]]

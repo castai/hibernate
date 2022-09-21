@@ -47,12 +47,18 @@ if __name__ == '__main__':
     if action == "resume":
         logging.info("Resuming cluster, autoscaling will be enabled")
         policy_changed = toggle_unschedulable_pod_policy_enabled(cluster_id, castai_api_token, True)
-        exit(0)
+        if policy_changed:
+            logging.info("Resume operation completed.")
+            exit(0)
+        else:
+            logging.error("Could not enable CAST AI autoscaler.")
+            exit(1)
 
     policy_changed = toggle_unschedulable_pod_policy_enabled(cluster_id, castai_api_token, False)
 
     hibernation_node_id = hibernation_node_already_exist(client=k8s_v1, taint=castai_pause_toleration,
                                                              k8s_label=cloud_labels[cloud])
+
     if not hibernation_node_id and cloud == "AKS":
         logging.info("Checking special Azure case if suitable Azure node could be converted")
         hibernation_node_id = azure_system_node(k8s_v1, k8s_label=cloud_labels[cloud], taint=castai_pause_toleration)
