@@ -139,6 +139,10 @@ spec:
               - secretRef:
                   name: castai-hibernate
             env:
+              - name: MY_NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.nodeName
               - name: CLOUD
                 value: "AKS"
               - name: ACTION
@@ -163,6 +167,7 @@ spec:
     spec:
       template:
         spec:
+          priorityClassName: system-cluster-critical
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
             operator: Exists
