@@ -124,3 +124,13 @@ def azure_system_node(client, k8s_label: str, taint: str):
         if patch_result:
             logging.info("node %s successfully patched", hibernation_node.metadata.name)
             return hibernation_node.metadata.labels["provisioner.cast.ai/node-id"]
+
+def get_node_castai_id(client, node_name: str):
+    """" Node with hibernation taint already exist """
+    k8s_label = "kubernetes.io/hostname="+node_name
+    node_list = client.list_node(label_selector=k8s_label)
+    if len(node_list.items) == 1:
+        for node in node_list.items:
+            node_id = node.metadata.labels.get("provisioner.cast.ai/node-id")
+            logging.info("found Node %s with id %s that is running Pause Job ", node.metadata.name, node_id)
+            return node_id

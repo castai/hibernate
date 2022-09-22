@@ -111,36 +111,45 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         return nodeId
 
 
-def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id):
+def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str, job_node_id=None):
     """" Delete all nodes through CAST AI mothership excluding hibernation node"""
+    node_list_result  = get_castai_nodes(cluster_id, castai_api_token)
+
+    for node in node_list_result["items"]:
+        # drain/delete each node
+        if node["id"] == hibernation_node_id or node["id"] == job_node_id:
+            logging.info("Skipping temp node: %s " % node["id"])
+        else:
+            logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
+            delete_castai_node(cluster_id, castai_api_token, node["id"])
+
+
+
+def get_castai_nodes(clusterid, castai_apitoken):
+    """ Get all nodes from CAST AI API inside the cluster"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
     header_dict = {"accept": "application/json",
+                   "X-API-Key": castai_apitoken}
+
+    resp = requests.get(url=url(clusterid), headers=header_dict)
+    if resp.status_code == 200:
+        return resp.json()
+
+
+def delete_castai_node(cluster_id, castai_api_token, node_id):
+    """ Delete single node"""
+    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
+    header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
+    paramsDelete = {
+        "forceDelete": True,
+        "drainTimeout": 60
+    }
 
-    with Session() as session:
-        try:
-            with session.get(url=url(cluster_id), headers=header_dict) as resp:
-                resp.raise_for_status()
-                node_list_result = resp.json()
-        except Exception as e:
-            raise NetworkError('Failed to get Nodes list') from e
-
-        urlDelete = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
-        paramsDelete = {
-            "forceDelete": True,
-            "drainTimeout": 60
-        }
-        for node in node_list_result["items"]:
-            # drain/delete each node
-            if node["id"] == hibernation_node_id:
-                logging.info("Skipping temp node: %s " % node["id"])
-            else:
-                logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
-                try:
-                    with session.delete(url=urlDelete(cluster_id, node["id"]), headers=header_dict,
-                                        params=paramsDelete) as deleteresp:
-                        deleteresp.raise_for_status()
-                        delete_node_result = deleteresp.json()
-                        logging.info(delete_node_result)
-                except Exception as e:
-                    raise NetworkError(f'Failed to delete node {delete_node_result}') from e
+    resp =  requests.delete(url=url(cluster_id, node_id), headers=header_dict, params=paramsDelete)
+    if resp.status_code == 200:
+        delete_node_result = resp.json()
+        logging.info(delete_node_result)
+        return True
+    else:
+        return False

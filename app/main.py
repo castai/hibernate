@@ -15,6 +15,8 @@ castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
+
+my_node_name = os.environ.get("MY_NODE_NAME")
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
@@ -79,6 +81,20 @@ if __name__ == '__main__':
     add_special_tolerations(client=k8s_v1_apps, namespace=cast_namespace, toleration=castai_pause_toleration)
     add_special_tolerations(client=k8s_v1_apps, namespace=cast_webhook_namespace, toleration=castai_pause_toleration)
 
-    delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id)
+    if my_node_name:
+        logging.info("Job pod node name found: %s", my_node_name)
+        my_node_name_id = get_node_castai_id(client=k8s_v1, node_name=my_node_name)
+
+    if my_node_name_id and my_node_name_id != hibernation_node_id:
+        logging.info("Job pod node id and hibernation node is not the same")
+        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, my_node_name_id)
+        defer_job_node_deletion = True
+    else:
+        logging.info("Delete all nodes except hibernation node")
+        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id)
+
+    if defer_job_node_deletion:
+        logging.info("Delete jobs node with id %s:", my_node_name_id)
+        delete_castai_node(cluster_id, castai_api_token, my_node_name_id)
 
     logging.info("Pause operation completed.")
