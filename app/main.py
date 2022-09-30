@@ -30,7 +30,7 @@ kube_system_namespace = "kube-system"
 instance_type = {
     "GKE": "e2-standard-2",
     "EKS": "m5a.large",
-    "AKS": "Standard_F2s_v2"
+    "AKS": "Standard_D2as_v5"
 }
 
 cloud_labels = {
