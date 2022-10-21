@@ -25,6 +25,10 @@ data:
     CASTAI-API-KEY-REPLACE-ME-WITH-ABOVE==
 ```
  
+for convenience one liner
+```shell
+kubectl get secret castai-hibernate -n castai-agent -o json | jq --arg API_KEY "$(echo -n 9834958-CASTAI-API-KEY-REPLACE-ME-5k2345jhk2 | base64)" '.data["API_KEY"]=$API_KEY' | kubectl apply -f -
+```
 
 ## How it works
 
