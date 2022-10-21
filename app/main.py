@@ -81,6 +81,7 @@ if __name__ == '__main__':
     add_special_tolerations(client=k8s_v1_apps, namespace=cast_namespace, toleration=castai_pause_toleration)
     add_special_tolerations(client=k8s_v1_apps, namespace=cast_webhook_namespace, toleration=castai_pause_toleration)
 
+    defer_job_node_deletion = False
     if my_node_name:
         logging.info("Job pod node name found: %s", my_node_name)
         my_node_name_id = get_node_castai_id(client=k8s_v1, node_name=my_node_name)
