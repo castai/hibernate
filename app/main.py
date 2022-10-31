@@ -13,6 +13,7 @@ config.load_incluster_config()
 
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
+instance_type = os.environ["HIBERNATE_NODE"]
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
 
@@ -67,7 +68,12 @@ if __name__ == '__main__':
 
     if not hibernation_node_id:
         logging.info("No hibernation node found, should make one")
-        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=instance_type[cloud],
+        hibernate_node_size = ""
+        if instance_type != "":
+            hibernate_node_size = instance_type
+        else:
+            hibernate_node_size = instance_type[cloud]
+        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_size,
                                                           k8s_taint=castai_pause_toleration, cloud=cloud)
 
     if hibernation_node_id:

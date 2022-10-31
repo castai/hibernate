@@ -145,6 +145,8 @@ spec:
                     fieldPath: spec.nodeName
               - name: CLOUD
                 value: "AKS"
+              - name: HIBERNATE_NODE
+                value: ""
               - name: ACTION
                 value: "pause"
               - name: CLUSTER_ID
@@ -182,6 +184,8 @@ spec:
             env:
               - name: CLOUD
                 value: "AKS"
+              - name: HIBERNATE_NODE
+                value: ""
               - name: ACTION
                 value: "resume"
               - name: CLUSTER_ID

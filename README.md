@@ -41,5 +41,9 @@ Hibernate-pause Job will
 Hibernate-resume Job will
  - Renable Unscheduled Pod Policy to allow cluster to expand to needed size
 
+Override default hibernate-node size
+ - Set the HIBERNATE_NODE environment variable to override the default node sizing selections. Make sure the size selected is appropriate for your cloud. 
+
 ## TODO
  - Auto detect Cloud 
+
