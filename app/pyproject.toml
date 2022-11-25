@@ -8,6 +8,8 @@ authors = ["Leon Kuperman", "Augustinas Stirbis"]
 python = "^3.9"
 requests = "^2.28.1"
 kubernetes = "^24.2.0"
+tenacity = "^8.1.0"
+python-dotenv = "^0.21.0"
 
 [tool.poetry.dev-dependencies]
 
