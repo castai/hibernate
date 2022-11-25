@@ -6,7 +6,6 @@ ENV PYTHONUNBUFFERED 1
 
 RUN mkdir /app
 COPY /app /app
-COPY app/pyproject.toml /app
 WORKDIR /app
 
 RUN pip install --disable-pip-version-check poetry

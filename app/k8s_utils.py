@@ -1,4 +1,5 @@
 import logging
+from utils import basic_retry
 from kubernetes.client.rest import ApiException
 
 
@@ -26,6 +27,7 @@ def cordon_all_nodes(client, exclude_node_id: str):
             logging.info("skip Cordoning node: %s" % node.metadata.name)
 
 
+@basic_retry(attempts=2, pause=5)
 def add_special_tolerations(client, namespace: str, toleration: str):
     """" modify essential deployment to keep them running on hibernation node (tolerate node)"""
     logging.info("add tolerations to essential workloads function")
@@ -79,7 +81,7 @@ def hibernation_node_already_exist(client, taint: str, k8s_label: str):
                     return node.metadata.labels.get("provisioner.cast.ai/node-id")
 
 
-def azure_system_node(client, k8s_label: str, taint: str):
+def azure_system_node(client, taint: str, k8s_label: str):
     """ mark existing AKS system node with hibernation Taint if small system node is found"""
 
     node_list = client.list_node(label_selector=k8s_label)

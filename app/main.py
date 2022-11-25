@@ -1,15 +1,26 @@
+import logging
 import os
 from cast_utils import *
 from k8s_utils import *
 from kubernetes import client, config
+from dotenv import load_dotenv
+from pathlib import Path
 
-# Run hibernate from local IDE
-# from dotenv import load_dotenv
-# load_dotenv()
-# config.load_kube_config()
+local_development = os.environ.get("LOCAL_DEVELOPMENT")
+# local_development = True
 
-# Run hibernate from container inside k8s
-config.load_incluster_config()
+if not local_development:
+    # Run hibernate from container inside k8s
+    config.load_incluster_config()
+else:
+    # Run hibernate from local IDE
+    logging.info(f"local dev: {local_development}")
+    load_dotenv(dotenv_path=Path('../.env'))
+    config.load_kube_config()
+
+
+k8s_v1 = client.CoreV1Api()
+k8s_v1_apps = client.AppsV1Api()
 
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
@@ -28,6 +39,7 @@ cast_webhook_namespace = "castai-pod-node-lifecycle"
 kube_system_namespace = "kube-system"
 
 # TODO: check essential pods CPU/RAM requirements and pick big enough node
+# TODO: not all instances types are available in all regions
 instance_type = {
     "GKE": "e2-standard-2",
     "EKS": "m5a.large",
@@ -39,9 +51,6 @@ cloud_labels = {
     "EKS": None,
     "AKS": "kubernetes.azure.com/mode=system"
 }
-
-k8s_v1 = client.CoreV1Api()
-k8s_v1_apps = client.AppsV1Api()
 
 
 def handle_resume():
@@ -60,11 +69,10 @@ def handle_suspend():
 
     if not hibernation_node_id and cloud == "AKS":
         logging.info("Checking special Azure case if suitable Azure node could be converted")
-        hibernation_node_id = azure_system_node(k8s_v1, k8s_label=cloud_labels[cloud], taint=castai_pause_toleration)
+        hibernation_node_id = azure_system_node(k8s_v1, taint=castai_pause_toleration, k8s_label=cloud_labels[cloud])
 
     if not hibernation_node_id:
         logging.info("No hibernation node found, should make one")
-        hibernate_node_size = ""
         if hibernate_node_type != "":
             hibernate_node_size = hibernate_node_type
         else:
@@ -83,6 +91,7 @@ def handle_suspend():
     add_special_tolerations(client=k8s_v1_apps, namespace=cast_webhook_namespace, toleration=castai_pause_toleration)
 
     defer_job_node_deletion = False
+    my_node_name_id = ""
     if my_node_name:
         logging.info("Job pod node name found: %s", my_node_name)
         my_node_name_id = get_node_castai_id(client=k8s_v1, node_name=my_node_name)
