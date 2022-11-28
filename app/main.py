@@ -24,7 +24,7 @@ k8s_v1_apps = client.AppsV1Api()
 
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
-hibernate_node_type = os.environ["HIBERNATE_NODE"]
+hibernate_node_type = os.environ.get("HIBERNATE_NODE")
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
 
@@ -73,7 +73,7 @@ def handle_suspend():
 
     if not hibernation_node_id:
         logging.info("No hibernation node found, should make one")
-        if hibernate_node_type != "":
+        if hibernate_node_type:
             hibernate_node_size = hibernate_node_type
         else:
             hibernate_node_size = instance_type[cloud]
