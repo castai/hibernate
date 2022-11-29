@@ -74,11 +74,19 @@ def hibernation_node_already_exist(client, taint: str, k8s_label: str):
     """" Node with hibernation taint already exist """
     node_list = client.list_node(label_selector=k8s_label)
     for node in node_list.items:
-        if node.spec.taints:
+        if node.spec.taints and node_is_ready(node):
             for current_taint in node.spec.taints:
                 if current_taint.to_dict()["key"] == taint:
                     logging.info("found hibernation compatible node with label %s and taint %s", k8s_label, taint)
                     return node.metadata.labels.get("provisioner.cast.ai/node-id")
+
+
+def node_is_ready(node):
+    node_scheduling = node.spec.unschedulable
+    for condition in node.status.conditions:
+        if condition.status and condition.type == "Ready" and not node_scheduling:
+            return True
+    return False
 
 
 def azure_system_node(client, taint: str, k8s_label: str):
@@ -88,10 +96,10 @@ def azure_system_node(client, taint: str, k8s_label: str):
     hibernation_node = None
 
     if len(node_list.items) > 0:
-        for any_node in node_list.items:
-            if int(any_node.status.capacity["cpu"]) == 2:
-                logging.info("Found Node with 2 CPU %s", any_node.metadata.name)
-                hibernation_node = any_node
+        for node in node_list.items:
+            if int(node.status.capacity["cpu"]) == 2 and node_is_ready(node):
+                logging.info("Found Node with 2 CPU %s", node.metadata.name)
+                hibernation_node = node
                 break
 
     if hibernation_node:

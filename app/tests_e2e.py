@@ -31,8 +31,7 @@ class Scenario:
                                                                   taint=main.castai_pause_toleration,
                                                                   k8s_label=main.cloud_labels[main.cloud])
         logging.info(f"TEST hibernation node found after cluster suspend: {hibernation_node_id}")
-        # TODO: https://castai.atlassian.net/browse/CORE-2796 (uncomment when regression fixed https://castai.atlassian.net/browse/CORE-2796)
-        # assert hibernation_node_id
+        assert hibernation_node_id
 
     @step
     def resume(self):
