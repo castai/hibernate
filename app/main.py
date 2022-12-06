@@ -55,7 +55,7 @@ cloud_labels = {
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")
-    policy_changed = toggle_unschedulable_pod_policy_enabled(cluster_id, castai_api_token, True)
+    policy_changed = toggle_autoscaler_top_flag(cluster_id, castai_api_token, True)
     if not policy_changed:
         raise Exception("could not enable CAST AI autoscaler.")
 
@@ -63,7 +63,7 @@ def handle_resume():
 
 
 def handle_suspend():
-    toggle_unschedulable_pod_policy_enabled(cluster_id, castai_api_token, False)
+    toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
     hibernation_node_id = hibernation_node_already_exist(client=k8s_v1, taint=castai_pause_toleration,
                                                          k8s_label=cloud_labels[cloud])
 
