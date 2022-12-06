@@ -38,20 +38,20 @@ def set_castai_policy(cluster_id, castai_api_token, updated_policies):
     if resp.status_code == 200:
         return resp.json()
 
-
-def toggle_unschedulable_pod_policy_enabled(cluster_id: str, castai_api_token: str, policy_value: bool):
+@basic_retry(attempts=2, pause=5)
+def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_value: bool):
     """" Disable CAST autoscaler to prevent adding new nodes automatically"""
 
     current_policies = get_castai_policy(cluster_id, castai_api_token)
 
-    if current_policies["unschedulablePods"]["enabled"] != policy_value:
+    if current_policies["enabled"] != policy_value:
         logging.info("Update policy. mismatch")
-        logging.info(f'Current: {current_policies["unschedulablePods"]["enabled"]}  Future: {policy_value}')
+        logging.info(f'Current: {current_policies["enabled"]}  Future: {policy_value}')
 
-        current_policies["unschedulablePods"]["enabled"] = policy_value
+        current_policies["enabled"] = policy_value
 
         validate_policies = set_castai_policy(cluster_id, castai_api_token, current_policies)
-        if validate_policies['unschedulablePods']["enabled"] == policy_value:
+        if validate_policies["enabled"] == policy_value:
             logging.info("Update completed")
             return True
         else:
@@ -61,7 +61,7 @@ def toggle_unschedulable_pod_policy_enabled(cluster_id: str, castai_api_token: s
         logging.info("skip policy update")
         return True
 
-@basic_retry(attempts=2, pause=5)
+@basic_retry(attempts=3, pause=5)
 def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, k8s_taint: str, cloud: str):
     """ Create Node with Taint that will stay running during hibernation"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
