@@ -34,9 +34,11 @@ logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
 spot_fallback = "scheduling.cast.ai/spot-fallback"
 cast_nodeID_label = "provisioner.cast.ai/node-id"
-cast_namespace = "castai-agent"
-cast_webhook_namespace = "castai-pod-node-lifecycle"
-kube_system_namespace = "kube-system"
+namespaces_to_keep = [
+    "castai-agent",
+    "castai-pod-node-lifecycle",
+    "kube-system"
+]
 
 # TODO: check essential pods CPU/RAM requirements and pick big enough node
 # TODO: not all instances types are available in all regions
@@ -86,9 +88,8 @@ def handle_suspend():
     else:
         raise Exception("no ready hibernation node exist")
 
-    add_special_tolerations(client=k8s_v1_apps, namespace=kube_system_namespace, toleration=castai_pause_toleration)
-    add_special_tolerations(client=k8s_v1_apps, namespace=cast_namespace, toleration=castai_pause_toleration)
-    add_special_tolerations(client=k8s_v1_apps, namespace=cast_webhook_namespace, toleration=castai_pause_toleration)
+    time.sleep(30)
+    [add_special_tolerations(client=k8s_v1_apps, namespace=ns, toleration=castai_pause_toleration) for ns in namespaces_to_keep]
 
     defer_job_node_deletion = False
     my_node_name_id = ""
