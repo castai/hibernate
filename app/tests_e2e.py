@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 import time
 from app import main
@@ -23,6 +22,7 @@ class Scenario:
         logging.info(f"TEST cluster status: {cluster.get('status')}, id: {cluster.get('id')}")
         assert cluster.get('status') == 'ready'
 
+
     @step
     def suspend(self):
         logging.info(f"TEST suspending cluster")
@@ -32,6 +32,7 @@ class Scenario:
                                                                   k8s_label=main.cloud_labels[main.cloud])
         logging.info(f"TEST hibernation node found after cluster suspend: {hibernation_node_id}")
         assert hibernation_node_id
+
 
     @step
     def resume(self):

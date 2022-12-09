@@ -27,6 +27,13 @@ def cordon_all_nodes(client, exclude_node_id: str):
             logging.info("skip Cordoning node: %s" % node.metadata.name)
 
 
+def deployment_tolerates(deployment, toleration):
+    """" check if deployment tolerates a taint on a hibernation node"""
+    if [tol_key for tol_key in deployment.spec.template.spec.tolerations if tol_key.key == toleration]:
+        return True
+    return False
+
+
 @basic_retry(attempts=2, pause=5)
 def add_special_tolerations(client, namespace: str, toleration: str):
     """" modify essential deployment to keep them running on hibernation node (tolerate node)"""
@@ -40,34 +47,37 @@ def add_special_tolerations(client, namespace: str, toleration: str):
 
     cast_deployment_list = client.list_namespaced_deployment(namespace)
     logging.info("deployments found %s", len(cast_deployment_list.items))
+
     for deployment in cast_deployment_list.items:
         deployment_name = deployment.metadata.name
-        logging.info("Patching and restarting: %s" % deployment_name)
-        current_tolerations = deployment.spec.template.spec.tolerations
+        if not deployment_tolerates(deployment, toleration):
+            current_tolerations = deployment.spec.template.spec.tolerations
+            logging.info("Patching and restarting: %s" % deployment_name)
+            if current_tolerations is None:
+                current_tolerations = []
+            current_tolerations.append(toleration_to_add)
 
-        if current_tolerations is None:
-            current_tolerations = []
-        current_tolerations.append(toleration_to_add)
-
-        restart_body = {
-            'spec': {
-                'template': {
-                    'spec': {
-                        'tolerations': current_tolerations
+            restart_body = {
+                'spec': {
+                    'template': {
+                        'spec': {
+                            'tolerations': current_tolerations
+                        }
                     }
                 }
             }
-        }
 
-        patch_result = None
-        try:
-            patch_result = client.patch_namespaced_deployment(deployment_name, namespace, restart_body)
-        except ApiException as e:
-            raise K8sAPIError(
-                f'Exception when calling AppsV1Api->patch_namespaced_deployment: {deployment_name}') from e
+            patch_result = None
+            try:
+                patch_result = client.patch_namespaced_deployment(deployment_name, namespace, restart_body)
+            except ApiException as e:
+                raise K8sAPIError(
+                    f'Exception when calling AppsV1Api->patch_namespaced_deployment: {deployment_name}') from e
 
-        if patch_result:
-            logging.info("Patch complete...")
+            if patch_result:
+                logging.info("Patch complete...")
+        else:
+            logging.info(f'SKIP Deployment {deployment_name} already has toleration')
 
 
 def hibernation_node_already_exist(client, taint: str, k8s_label: str):
