@@ -29,7 +29,7 @@ module "castai-aks-cluster" {
 
   node_configurations = {
     default = {
-      disk_cpu_ratio = 25
+      disk_cpu_ratio = 5
       subnets        = [azurerm_subnet.internal.id]
       tags           = {
         "env" : "prod"

@@ -27,11 +27,11 @@ class Scenario:
     def suspend(self):
         logging.info(f"TEST suspending cluster")
         main.handle_suspend()
-        hibernation_node_id = main.hibernation_node_already_exist(client=main.k8s_v1,
-                                                                  taint=main.castai_pause_toleration,
-                                                                  k8s_label=main.cloud_labels[main.cloud])
-        logging.info(f"TEST hibernation node found after cluster suspend: {hibernation_node_id}")
-        assert hibernation_node_id
+
+        nodes = main.get_castai_nodes(main.cluster_id, main.castai_api_token)
+        logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
+        assert len(nodes["items"])==1
+
 
 
     @step
@@ -39,7 +39,7 @@ class Scenario:
         logging.info(f"TEST resuming cluster")
         main.handle_resume()
         policy_json = main.get_castai_policy(main.cluster_id, main.castai_api_token)
-        assert policy_json["unschedulablePods"]["enabled"]
+        assert policy_json["enabled"]
 
 
 def test_all():
@@ -48,8 +48,8 @@ def test_all():
 
     scenario.cluster_is_ready()
     scenario.suspend()
-    time.sleep(35)
+    time.sleep(15)
     scenario.cluster_is_ready()
-    time.sleep(35)
+    time.sleep(15)
     scenario.resume()
     scenario.cluster_is_ready()

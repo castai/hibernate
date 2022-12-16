@@ -47,7 +47,7 @@ AKS is set by default, but requires changing in both CronJobs "Cloud" env variab
 Hibernate-pause Job will 
  - Disable Unscheduled Pod Policy (to prevent growing cluster)
  - Prepare Hibernation node (node that will stay hosting essential components)
- - Mark essential Deployments with Hibernation toleration
+ - Mark essential Deployments with Hibernation toleration (system critical and with NAMESPACES_TO_KEEP env var)
  - Delete all other nodes (only hibernation node should stay running)
 
 Hibernate-resume Job will
@@ -56,6 +56,20 @@ Hibernate-resume Job will
 Override default hibernate-node size
  - Set the HIBERNATE_NODE environment variable to override the default node sizing selections. Make sure the size selected is appropriate for your cloud. 
 
+Override default NAMESPACES_TO_KEEP
+ - Set the NAMESPACES_TO_KEEP environment variable to override, "opa,istio"" 
+
 ## TODO
  - Auto detect Cloud 
 
+# Development
+
+Create [aks|eks|gke] K8s cluster 
+- create file hack/aks/local.auto.tfvars from example
+- run "make aks"
+- connect to cluster / switch kubectl context
+
+Run code locally
+- copy cluster_id from console.cast.ai to .env file (example .env.example)
+- uncomment in main.py # local_development = True
+- run end2end tests

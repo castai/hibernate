@@ -147,6 +147,8 @@ spec:
                 value: "AKS"
               - name: HIBERNATE_NODE
                 value: ""
+              - name: NAMESPACES_TO_KEEP
+                value: ""
               - name: ACTION
                 value: "pause"
               - name: CLUSTER_ID
@@ -184,8 +186,6 @@ spec:
             env:
               - name: CLOUD
                 value: "AKS"
-              - name: HIBERNATE_NODE
-                value: ""
               - name: ACTION
                 value: "resume"
               - name: CLUSTER_ID

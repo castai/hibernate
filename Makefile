@@ -2,7 +2,7 @@ default: release
 
 APP="castai/hibernate"
 TAG_LATEST=$(APP):latest
-#TAG_LATEST=$(APP):test1
+TAG_VERSION=$(APP):v0.2
 
 gke:
 	(cd ./hack/gke && terraform init && terraform apply -auto-approve)
@@ -21,11 +21,11 @@ pull:
 
 build:
 	@echo "==> Building hibernate container"
-	docker build --cache-from $(TAG_LATEST) --platform linux/amd64 -t $(TAG_LATEST) .
+	docker build --cache-from $(TAG_LATEST) --platform linux/amd64 -t $(TAG_LATEST) -t $(TAG_VERSION) .
 
 publish:
 	@echo "==> pushing to docker hub"
-	docker push $(TAG_LATEST)
+	docker push --all-tags $(APP)
 
 release: pull
 release: build

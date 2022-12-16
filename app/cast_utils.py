@@ -137,15 +137,28 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
             delete_castai_node(cluster_id, castai_api_token, node["id"])
 
 
-def get_castai_nodes(clusterid, castai_apitoken):
+def get_castai_nodes(cluster_id, castai_api_token):
     """ Get all nodes from CAST AI API inside the cluster"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
     header_dict = {"accept": "application/json",
-                   "X-API-Key": castai_apitoken}
+                   "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(clusterid), headers=header_dict)
+    resp = requests.get(url=url(cluster_id), headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
+
+def get_castai_node_by_id(cluster_id, castai_api_token, node_id):
+    """ Get node by CAST AI id from CAST AI API"""
+    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
+    header_dict = {"accept": "application/json",
+                   "X-API-Key": castai_api_token}
+
+    resp = requests.get(url=url(cluster_id, node_id), headers=header_dict)
+    if resp.status_code == 200:
+        if resp.json()['name']:
+            return resp.json()['name']
+        else:
+            return False
 
 
 def delete_castai_node(cluster_id, castai_api_token, node_id):
