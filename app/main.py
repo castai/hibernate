@@ -18,7 +18,6 @@ else:
     load_dotenv(dotenv_path=Path('../.env'))
     config.load_kube_config()
 
-
 k8s_v1 = client.CoreV1Api()
 k8s_v1_apps = client.AppsV1Api()
 
@@ -27,6 +26,7 @@ cluster_id = os.environ["CLUSTER_ID"]
 hibernate_node_type = os.environ.get("HIBERNATE_NODE")
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
+user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
 
 my_node_name = os.environ.get("MY_NODE_NAME")
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
@@ -35,12 +35,10 @@ castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
 spot_fallback = "scheduling.cast.ai/spot-fallback"
 cast_nodeID_label = "provisioner.cast.ai/node-id"
 namespaces_to_keep = [
-    "castai-agent",
     "castai-pod-node-lifecycle",
     "kube-system"
 ]
 
-# TODO: check essential pods CPU/RAM requirements and pick big enough node
 # TODO: not all instances types are available in all regions
 instance_type = {
     "GKE": "e2-standard-2",
@@ -85,11 +83,26 @@ def handle_suspend():
     if hibernation_node_id:
         logging.info("Hibernation node exist: %s", hibernation_node_id)
         cordon_all_nodes(k8s_v1, exclude_node_id=hibernation_node_id)
+        time.sleep(20)
     else:
         raise Exception("no ready hibernation node exist")
 
-    time.sleep(30)
-    [add_special_tolerations(client=k8s_v1_apps, namespace=ns, toleration=castai_pause_toleration) for ns in namespaces_to_keep]
+
+    for deploy in get_deployments_names_with_system_priority_class(client=k8s_v1_apps):
+        add_special_toleration(client=k8s_v1_apps, deployment=deploy, toleration=castai_pause_toleration)
+
+    if user_namespaces_to_keep:
+        logging.info(f'user provided namespaces_to_keep is not empty {user_namespaces_to_keep}')
+        for namespace in user_namespaces_to_keep.split(","):
+            namespaces_to_keep.append(namespace)
+
+    for namespace in namespaces_to_keep:
+        logging.info(f"additional namespace {namespace} to patch")
+        deploys = k8s_v1_apps.list_namespaced_deployment(namespace=namespace)
+        for deploy in deploys.items:
+            logging.info(f'Additional {namespace} deployment {deploy.metadata.name} will be patched')
+            add_special_toleration(client=k8s_v1_apps, deployment=deploy, toleration=castai_pause_toleration)
+
 
     defer_job_node_deletion = False
     my_node_name_id = ""
@@ -104,6 +117,10 @@ def handle_suspend():
     else:
         logging.info("Delete all nodes except hibernation node")
         delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id)
+
+    hibernation_node_name = get_castai_node_by_id(cluster_id=cluster_id, castai_api_token=castai_api_token,
+                                                  node_id=hibernation_node_id)
+    remove_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=hibernation_node_name)
 
     if defer_job_node_deletion:
         logging.info("Delete jobs node with id %s:", my_node_name_id)

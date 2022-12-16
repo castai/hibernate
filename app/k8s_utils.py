@@ -29,13 +29,14 @@ def cordon_all_nodes(client, exclude_node_id: str):
 
 def deployment_tolerates(deployment, toleration):
     """" check if deployment tolerates a taint on a hibernation node"""
-    if [tol_key for tol_key in deployment.spec.template.spec.tolerations if tol_key.key == toleration]:
-        return True
+    if deployment.spec.template.spec.tolerations:
+        if [tol_key for tol_key in deployment.spec.template.spec.tolerations if tol_key.key == toleration]:
+            return True
     return False
 
 
 @basic_retry(attempts=2, pause=5)
-def add_special_tolerations(client, namespace: str, toleration: str):
+def add_special_toleration(client, deployment: str, toleration: str):
     """" modify essential deployment to keep them running on hibernation node (tolerate node)"""
     logging.info("add tolerations to essential workloads function")
 
@@ -45,39 +46,36 @@ def add_special_tolerations(client, namespace: str, toleration: str):
         'operator': 'Exists'
     }
 
-    cast_deployment_list = client.list_namespaced_deployment(namespace)
-    logging.info("deployments found %s", len(cast_deployment_list.items))
+    deployment_name = deployment.metadata.name
+    if not deployment_tolerates(deployment, toleration):
+        current_tolerations = deployment.spec.template.spec.tolerations
+        logging.info("Patching and restarting: %s" % deployment_name)
+        if current_tolerations is None:
+            current_tolerations = []
+        current_tolerations.append(toleration_to_add)
 
-    for deployment in cast_deployment_list.items:
-        deployment_name = deployment.metadata.name
-        if not deployment_tolerates(deployment, toleration):
-            current_tolerations = deployment.spec.template.spec.tolerations
-            logging.info("Patching and restarting: %s" % deployment_name)
-            if current_tolerations is None:
-                current_tolerations = []
-            current_tolerations.append(toleration_to_add)
-
-            restart_body = {
-                'spec': {
-                    'template': {
-                        'spec': {
-                            'tolerations': current_tolerations
-                        }
+        restart_body = {
+            'spec': {
+                'template': {
+                    'spec': {
+                        'tolerations': current_tolerations
                     }
                 }
             }
+        }
 
-            patch_result = None
-            try:
-                patch_result = client.patch_namespaced_deployment(deployment_name, namespace, restart_body)
-            except ApiException as e:
-                raise K8sAPIError(
-                    f'Exception when calling AppsV1Api->patch_namespaced_deployment: {deployment_name}') from e
+        patch_result = None
+        try:
+            patch_result = client.patch_namespaced_deployment(deployment_name, deployment.metadata.namespace,
+                                                              restart_body)
+        except ApiException as e:
+            raise K8sAPIError(
+                f'Exception when calling patching deployment: {deployment_name} with result {patch_result}') from e
 
-            if patch_result:
-                logging.info("Patch complete...")
-        else:
-            logging.info(f'SKIP Deployment {deployment_name} already has toleration')
+        if patch_result:
+            logging.info("Patch complete...")
+    else:
+        logging.info(f'SKIP Deployment {deployment_name} already has toleration')
 
 
 def hibernation_node_already_exist(client, taint: str, k8s_label: str):
@@ -145,12 +143,54 @@ def azure_system_node(client, taint: str, k8s_label: str):
             logging.info("node %s successfully patched", hibernation_node.metadata.name)
             return hibernation_node.metadata.labels["provisioner.cast.ai/node-id"]
 
+
+def remove_node_taint(client, pause_taint: str, node_name):
+    """ remove specific taint from node"""
+    logging.info(f'patching node {node_name} to remove {pause_taint} taint')
+
+    k8s_label = "kubernetes.io/hostname=" + node_name
+    node = client.list_node(label_selector=k8s_label).items[0]
+
+    taints = node.spec.taints
+    filtered_taints = list(filter(lambda x: x.key != pause_taint, taints))
+    taint_body = {"spec": {"taints": filtered_taints}}
+
+    try:
+        patch_result = client.patch_node(node.metadata.name, taint_body)
+    except ApiException as e:
+        raise K8sAPIError(f'Failed to remove taint from node {node.metadata.name}') from e
+
+    if patch_result:
+        logging.info(f'node {node_name} successfully patched')
+        return True
+    else:
+        logging.error(f'failed to patch node {node_name}, with details {patch_result}')
+
+
 def get_node_castai_id(client, node_name: str):
     """" Node with hibernation taint already exist """
-    k8s_label = "kubernetes.io/hostname="+node_name
+    k8s_label = "kubernetes.io/hostname=" + node_name
     node_list = client.list_node(label_selector=k8s_label)
     if len(node_list.items) == 1:
         for node in node_list.items:
             node_id = node.metadata.labels.get("provisioner.cast.ai/node-id")
             logging.info("found Node %s with id %s that is running Pause Job ", node.metadata.name, node_id)
             return node_id
+
+
+def get_deployments_names_with_system_priority_class(client):
+    """Return all system-critical priority-class deployments"""
+    deployments = client.list_deployment_for_all_namespaces()
+    critical_deploys = []
+    for deployment in deployments.items:
+        if has_system_priority_class(deployment): critical_deploys.append(deployment)
+    return critical_deploys
+
+
+def has_system_priority_class(deployment):
+    """ validate if Deployment is system critical"""
+    if deployment.spec.template.spec.priority_class_name in ("system-cluster-critical","system-node-critical"):
+        logging.info(f'SYSTEM CRITICAL {deployment.metadata.name} found')
+        return True
+    else:
+        return False
