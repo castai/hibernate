@@ -59,6 +59,8 @@ Override default hibernate-node size
 Override default NAMESPACES_TO_KEEP
  - Set the NAMESPACES_TO_KEEP environment variable to override, "opa,istio"" 
 
+Override default "PROTECT_EVICTION_DISABLED" and set to "true" to prevent the removal of removal-disabled nodes from being removed during hibernate. 
+
 ## TODO
  - Auto detect Cloud 
 
