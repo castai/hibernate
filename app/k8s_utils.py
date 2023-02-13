@@ -7,7 +7,7 @@ class K8sAPIError(Exception):
     pass
 
 
-def cordon_all_nodes(client, protect_eviction_disabled, exclude_node_id: str):
+def cordon_all_nodes(client, protect_removal_disabled: str, exclude_node_id: str):
     """cordon all the nodes so essential components could be scheduled only on hybernation node"""
     logging.info("Cordon function")
 
@@ -21,7 +21,7 @@ def cordon_all_nodes(client, protect_eviction_disabled, exclude_node_id: str):
     for node in node_list.items:
         logging.info("Inspecting node %s to cordon", node.metadata.name)
         skip=False
-        if node.metadata.labels.get("autoscaling.cast.ai/removal-disabled")=="true" and protect_eviction_disabled=="true":
+        if node.metadata.labels.get("autoscaling.cast.ai/removal-disabled")=="true" and protect_removal_disabled=="true":
             skip=True
         if node.metadata.labels.get("provisioner.cast.ai/node-id") != exclude_node_id and not skip:
             logging.info("Cordoning: %s" % node.metadata.name)

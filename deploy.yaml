@@ -149,7 +149,7 @@ spec:
                 value: ""
               - name: NAMESPACES_TO_KEEP
                 value: ""
-              - name: PROTECT_EVICTION_DISABLED
+              - name: PROTECT_REMOVAL_DISABLED
                 value: "false"
               - name: ACTION
                 value: "pause"

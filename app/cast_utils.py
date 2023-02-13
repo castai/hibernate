@@ -124,13 +124,12 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         return nodeId
 
 
-def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str, protect_eviction_disabled: bool, job_node_id=None):
+def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str, protect_removal_disabled: str, job_node_id=None):
     """" Delete all nodes through CAST AI mothership excluding hibernation node"""
     node_list_result = get_castai_nodes(cluster_id, castai_api_token)
-    logging.info(protect_eviction_disabled)
     for node in node_list_result["items"]:
         skip=False
-        if "autoscaling.cast.ai/removal-disabled" in node["labels"] and protect_eviction_disabled=="true":
+        if "autoscaling.cast.ai/removal-disabled" in node["labels"] and protect_removal_disabled=="true":
             if node["labels"]["autoscaling.cast.ai/removal-disabled"] == "true":
                 skip=True
         # drain/delete each node

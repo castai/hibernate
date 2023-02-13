@@ -27,7 +27,7 @@ hibernate_node_type = os.environ.get("HIBERNATE_NODE")
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
 user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
-protect_eviction_disabled = os.environ.get("PROTECT_EVICTION_DISABLED")
+protect_removal_disabled = os.environ.get("PROTECT_REMOVAL_DISABLED")
 
 my_node_name = os.environ.get("MY_NODE_NAME")
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
