@@ -27,6 +27,7 @@ hibernate_node_type = os.environ.get("HIBERNATE_NODE")
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
 user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
+protect_removal_disabled = os.environ.get("PROTECT_REMOVAL_DISABLED")
 
 my_node_name = os.environ.get("MY_NODE_NAME")
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
@@ -82,7 +83,7 @@ def handle_suspend():
 
     if hibernation_node_id:
         logging.info("Hibernation node exist: %s", hibernation_node_id)
-        cordon_all_nodes(k8s_v1, exclude_node_id=hibernation_node_id)
+        cordon_all_nodes(k8s_v1, protect_removal_disabled, exclude_node_id=hibernation_node_id)
         time.sleep(20)
     else:
         raise Exception("no ready hibernation node exist")
@@ -112,11 +113,11 @@ def handle_suspend():
 
     if my_node_name_id and my_node_name_id != hibernation_node_id:
         logging.info("Job pod node id and hibernation node is not the same")
-        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, my_node_name_id)
+        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, protect_removal_disabled, my_node_name_id)
         defer_job_node_deletion = True
     else:
         logging.info("Delete all nodes except hibernation node")
-        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id)
+        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, protect_removal_disabled)
 
     hibernation_node_name = get_castai_node_by_id(cluster_id=cluster_id, castai_api_token=castai_api_token,
                                                   node_id=hibernation_node_id)
