@@ -23,7 +23,7 @@ k8s_v1_apps = client.AppsV1Api()
 
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
-hibernate_node_type = os.environ.get("HIBERNATE_NODE")
+hibernate_node_type_override = os.environ.get("HIBERNATE_NODE")
 cloud = os.environ["CLOUD"]
 action = os.environ["ACTION"]
 user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
@@ -65,23 +65,31 @@ def handle_resume():
 
 def handle_suspend():
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
-    hibernation_node_id = hibernation_node_already_exist(client=k8s_v1, taint=castai_pause_toleration,
-                                                         k8s_label=cloud_labels[cloud])
 
-    if not hibernation_node_id and cloud == "AKS":
-        logging.info("Checking special Azure case if suitable Azure node could be converted")
-        hibernation_node_id = azure_system_node(k8s_v1, taint=castai_pause_toleration, k8s_label=cloud_labels[cloud])
+    if hibernate_node_type_override:
+        hibernate_node_type = hibernate_node_type_override
+    else:
+        hibernate_node_type = instance_type[cloud]
+
+    candidate_node = get_suitable_hibernation_node(cluster_id=cluster_id, castai_api_token=castai_api_token,
+                                                      instance_type=hibernate_node_type, cloud=cloud)
+        # ,
+        #                                               cloud_labels=cloud_labels[cloud])
+    hibernation_node_id = None
+    if candidate_node:
+        logging.info("Found suitable hibernation candidate node: %s", candidate_node)
+        add_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=candidate_node)
+        hibernation_node_id = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
+                                                         node_name=candidate_node)
 
     if not hibernation_node_id:
-        logging.info("No hibernation node found, should make one")
-        if hibernate_node_type:
-            hibernate_node_size = hibernate_node_type
-        else:
-            hibernate_node_size = instance_type[cloud]
-        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_size,
+        logging.info("No suitable hibernation node found, should make one")
+        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_type,
                                                       k8s_taint=castai_pause_toleration, cloud=cloud)
 
-    if hibernation_node_id:
+    hibernation_node_status = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
+                                                               node_id=hibernation_node_id)
+    if hibernation_node_status:
         logging.info("Hibernation node exist: %s", hibernation_node_id)
         cordon_all_nodes(k8s_v1, protect_removal_disabled, exclude_node_id=hibernation_node_id)
         time.sleep(20)
@@ -119,9 +127,7 @@ def handle_suspend():
         logging.info("Delete all nodes except hibernation node")
         delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, protect_removal_disabled)
 
-    hibernation_node_name = get_castai_node_by_id(cluster_id=cluster_id, castai_api_token=castai_api_token,
-                                                  node_id=hibernation_node_id)
-    remove_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=hibernation_node_name)
+    remove_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_id=hibernation_node_id)
 
     if defer_job_node_deletion:
         logging.info("Delete jobs node with id %s:", my_node_name_id)

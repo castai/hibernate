@@ -143,6 +143,30 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
                 delete_castai_node(cluster_id, castai_api_token, node["id"])
 
 
+def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_token: str, instance_type: str):
+    """" Get all nodes by instance type"""
+    node_list_result = get_castai_nodes(cluster_id, castai_api_token)
+    nodes = []
+    for node in node_list_result["items"]:
+        if node["instanceType"] == instance_type and node["state"]["phase"] == "ready":
+            nodes.append(node)
+    logging.info("Found %s nodes with instance type: %s" % (len(nodes), instance_type))
+    return nodes
+
+
+def get_suitable_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, cloud: str):
+    cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_token, instance_type=instance_type)
+    for node in sorted(cast_nodes, key=lambda k: k['createdAt']):
+        logging.info("Checking suitability on node: %s" % node["name"])
+        if not node["taints"]:
+            logging.info("Suitable node no taints")
+            if cloud == "AKS": # Azure special case use system node
+                if node["labels"]["kubernetes.azure.com/mode"] == "system":
+                    return node["name"]
+            else:
+                return node["name"]
+
+
 def get_castai_nodes(cluster_id, castai_api_token):
     """ Get all nodes from CAST AI API inside the cluster"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
@@ -153,7 +177,8 @@ def get_castai_nodes(cluster_id, castai_api_token):
     if resp.status_code == 200:
         return resp.json()
 
-def get_castai_node_by_id(cluster_id, castai_api_token, node_id):
+
+def get_castai_node_name_by_id(cluster_id, castai_api_token, node_id):
     """ Get node by CAST AI id from CAST AI API"""
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
     header_dict = {"accept": "application/json",
