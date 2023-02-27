@@ -22,6 +22,6 @@ build/
 
 
 # Credentials
-local.auto.tfvars
+tf.vars
 
 

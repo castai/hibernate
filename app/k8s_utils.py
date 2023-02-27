@@ -1,4 +1,5 @@
 import logging
+from app import main
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
 
@@ -20,9 +21,10 @@ def cordon_all_nodes(client, protect_removal_disabled: str, exclude_node_id: str
     node_list = client.list_node()
     for node in node_list.items:
         logging.info("Inspecting node %s to cordon", node.metadata.name)
-        skip=False
-        if node.metadata.labels.get("autoscaling.cast.ai/removal-disabled")=="true" and protect_removal_disabled=="true":
-            skip=True
+        skip = False
+        if node.metadata.labels.get(
+                "autoscaling.cast.ai/removal-disabled") == "true" and protect_removal_disabled == "true":
+            skip = True
         if node.metadata.labels.get("provisioner.cast.ai/node-id") != exclude_node_id and not skip:
             logging.info("Cordoning: %s" % node.metadata.name)
             client.patch_node(node.metadata.name, node_body)
@@ -81,18 +83,31 @@ def add_special_toleration(client, deployment: str, toleration: str):
         logging.info(f'SKIP Deployment {deployment_name} already has toleration')
 
 
-def hibernation_node_already_exist(client, taint: str, k8s_label: str):
-    """" Node with hibernation taint already exist """
-    node_list = client.list_node(label_selector=k8s_label)
-    for node in node_list.items:
-        if node.spec.taints and node_is_ready(node):
-            for current_taint in node.spec.taints:
-                if current_taint.to_dict()["key"] == taint:
-                    logging.info("found hibernation compatible node with label %s and taint %s", k8s_label, taint)
+def check_hibernation_node_readiness(client, taint: str, node_name=None, node_id=None):
+    """ check if node has taint """
+    if not node_name:
+        logging.info("node name is not specified")
+        node_name=main.get_castai_node_name_by_id(main.cluster_id, main.castai_api_token, node_id)
+        if node_name:
+            logging.info("node name %s found by node-id %s from CAST API",  node_name, node_id)
+        else:
+            logging.error("node with id %s not found", node_id)
+            return None
+
+    node = client.read_node(node_name)
+
+    if node.spec.taints:
+        for current_taint in node.spec.taints:
+            if current_taint.to_dict()["key"] == taint:
+                if node_is_ready(node):
+                    logging.info("found tainted hibernation node %s", node_name)
                     return node.metadata.labels.get("provisioner.cast.ai/node-id")
+    logging.info("Hibernation node %s is not READY %s", node_name)
+    return None
 
 
-def node_is_ready(node):
+def node_is_ready(node: str):
+    """ check if node is ready """
     node_scheduling = node.spec.unschedulable
     for condition in node.status.conditions:
         if condition.status and condition.type == "Ready" and not node_scheduling:
@@ -100,59 +115,49 @@ def node_is_ready(node):
     return False
 
 
-def azure_system_node(client, taint: str, k8s_label: str):
-    """ mark existing AKS system node with hibernation Taint if small system node is found"""
-
-    node_list = client.list_node(label_selector=k8s_label)
-    hibernation_node = None
-
-    if len(node_list.items) > 0:
-        for node in node_list.items:
-            if int(node.status.capacity["cpu"]) == 2 and node_is_ready(node):
-                logging.info("Found Node with 2 CPU %s", node.metadata.name)
-                hibernation_node = node
-                break
-
-    if hibernation_node:
-        taint_to_add = {"key": taint, "effect": "NoSchedule"}
-        logging.info("found single system nodes, will add taint")
-
-        current_taints = hibernation_node.spec.taints
-        if current_taints is None:
-            current_taints = []
-        current_taints.append(taint_to_add)
-
-        taint_body = {
-            "spec": {
-                "taints": current_taints
-            },
-            "metadata": {
-                "labels": {
-                    "scheduling.cast.ai/paused-cluster": "true",
-                    "scheduling.cast.ai/spot-fallback": "true",
-                    "scheduling.cast.ai/spot": "true"
-                }
-            }
-        }
-
-        logging.info("patching node %s with taint", hibernation_node.metadata.name)
-        patch_result = None
-        try:
-            patch_result = client.patch_node(hibernation_node.metadata.name, taint_body)
-        except ApiException as e:
-            raise K8sAPIError(f'Failed to taint node {hibernation_node.metadata.name}') from e
-
-        if patch_result:
-            logging.info("node %s successfully patched", hibernation_node.metadata.name)
-            return hibernation_node.metadata.labels["provisioner.cast.ai/node-id"]
-
-
-def remove_node_taint(client, pause_taint: str, node_name):
-    """ remove specific taint from node"""
-    logging.info(f'patching node {node_name} to remove {pause_taint} taint')
+@basic_retry(attempts=2, pause=5)
+def add_node_taint(client, pause_taint: str, node_name):
+    """ add specific taint to node"""
+    logging.info(f'patching node {node_name} to add {pause_taint} taint')
 
     k8s_label = "kubernetes.io/hostname=" + node_name
     node = client.list_node(label_selector=k8s_label).items[0]
+
+    taint_to_add = {"key": pause_taint, "effect": "NoSchedule"}
+    current_taints = node.spec.taints
+    if current_taints is None:
+        current_taints = []
+    current_taints.append(taint_to_add)
+
+    taint_body = {
+        "spec": {
+            "taints": current_taints
+        },
+        "metadata": {
+            "labels": {
+                "scheduling.cast.ai/paused-cluster": "true",
+                "scheduling.cast.ai/spot-fallback": "true",
+                "scheduling.cast.ai/spot": "true"
+            }
+        }
+    }
+
+    try:
+        patch_result = client.patch_node(node.metadata.name, taint_body)
+    except ApiException as e:
+        raise K8sAPIError(f'Failed to taint node {node.metadata.name}') from e
+
+    if patch_result:
+        logging.info("node %s successfully patched", node.metadata.name)
+
+
+@basic_retry(attempts=2, pause=5)
+def remove_node_taint(client, pause_taint: str, node_id: str):
+    """ remove specific taint from node"""
+    node = client.list_node(label_selector=f"provisioner.cast.ai/node-id={node_id}").items[0]
+    node_name = node.metadata.name
+
+    logging.info(f'patching node {node_name} to remove {pause_taint} taint')
 
     taints = node.spec.taints
     filtered_taints = list(filter(lambda x: x.key != pause_taint, taints))
@@ -170,6 +175,7 @@ def remove_node_taint(client, pause_taint: str, node_name):
         logging.error(f'failed to patch node {node_name}, with details {patch_result}')
 
 
+@basic_retry(attempts=2, pause=5)
 def get_node_castai_id(client, node_name: str):
     """" Node with hibernation taint already exist """
     k8s_label = "kubernetes.io/hostname=" + node_name
@@ -192,7 +198,7 @@ def get_deployments_names_with_system_priority_class(client):
 
 def has_system_priority_class(deployment):
     """ validate if Deployment is system critical"""
-    if deployment.spec.template.spec.priority_class_name in ("system-cluster-critical","system-node-critical"):
+    if deployment.spec.template.spec.priority_class_name in ("system-cluster-critical", "system-node-critical"):
         logging.info(f'SYSTEM CRITICAL {deployment.metadata.name} found')
         return True
     else:

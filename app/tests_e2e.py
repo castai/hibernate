@@ -28,10 +28,10 @@ class Scenario:
         logging.info(f"TEST suspending cluster")
         main.handle_suspend()
 
+        time.sleep(180)
         nodes = main.get_castai_nodes(main.cluster_id, main.castai_api_token)
         logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
         assert len(nodes["items"])==1
-
 
 
     @step
@@ -45,7 +45,6 @@ class Scenario:
 def test_all():
     logging.info("TEST AKS test started")
     scenario = Scenario()
-
     scenario.cluster_is_ready()
     scenario.suspend()
     time.sleep(15)
