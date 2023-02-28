@@ -73,8 +73,7 @@ def handle_suspend():
 
     candidate_node = get_suitable_hibernation_node(cluster_id=cluster_id, castai_api_token=castai_api_token,
                                                       instance_type=hibernate_node_type, cloud=cloud)
-        # ,
-        #                                               cloud_labels=cloud_labels[cloud])
+
     hibernation_node_id = None
     if candidate_node:
         logging.info("Found suitable hibernation candidate node: %s", candidate_node)
@@ -87,8 +86,11 @@ def handle_suspend():
         hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_type,
                                                       k8s_taint=castai_pause_toleration, cloud=cloud)
 
+
+    node_name=get_castai_node_name_by_id(cluster_id, castai_api_token, hibernation_node_id)
+
     hibernation_node_status = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
-                                                               node_id=hibernation_node_id)
+                                                               node_name=node_name)
     if hibernation_node_status:
         logging.info("Hibernation node exist: %s", hibernation_node_id)
         cordon_all_nodes(k8s_v1, protect_removal_disabled, exclude_node_id=hibernation_node_id)

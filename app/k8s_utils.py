@@ -1,8 +1,6 @@
 import logging
-from app import main
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
-
 
 class K8sAPIError(Exception):
     pass
@@ -83,17 +81,8 @@ def add_special_toleration(client, deployment: str, toleration: str):
         logging.info(f'SKIP Deployment {deployment_name} already has toleration')
 
 
-def check_hibernation_node_readiness(client, taint: str, node_name=None, node_id=None):
+def check_hibernation_node_readiness(client, taint: str, node_name: str):
     """ check if node has taint """
-    if not node_name:
-        logging.info("node name is not specified")
-        node_name=main.get_castai_node_name_by_id(main.cluster_id, main.castai_api_token, node_id)
-        if node_name:
-            logging.info("node name %s found by node-id %s from CAST API",  node_name, node_id)
-        else:
-            logging.error("node with id %s not found", node_id)
-            return None
-
     node = client.read_node(node_name)
 
     if node.spec.taints:
