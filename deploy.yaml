@@ -158,8 +158,8 @@ spec:
                   configMapKeyRef:
                     name: castai-cluster-controller
                     key: CLUSTER_ID
-          restartPolicy: OnFailure
-      backoffLimit: 2
+          restartPolicy: Never
+      backoffLimit: 0
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -195,6 +195,6 @@ spec:
                   configMapKeyRef:
                     name: castai-cluster-controller
                     key: CLUSTER_ID
-          restartPolicy: OnFailure
-      backoffLimit: 2
+          restartPolicy: Never
+      backoffLimit: 0
 ---
