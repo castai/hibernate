@@ -66,6 +66,11 @@ def handle_resume():
 def handle_suspend():
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
 
+    my_node_name_id = ""
+    if my_node_name:
+        logging.info("Job pod node name found: %s", my_node_name)
+        my_node_name_id = get_node_castai_id(client=k8s_v1, node_name=my_node_name)
+
     if hibernate_node_type_override:
         hibernate_node_type = hibernate_node_type_override
     else:
@@ -80,6 +85,17 @@ def handle_suspend():
         add_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=candidate_node)
         hibernation_node_id = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
                                                          node_name=candidate_node)
+
+    if my_node_name_id == hibernation_node_id:
+        node_list_result = get_castai_nodes(cluster_id, castai_api_token)
+        nodes = []
+        for node in node_list_result["items"]:
+            if node["state"]["phase"] == "ready":
+                nodes.append(node)
+        logging.info(f'Number of READY nodes found in the cluster: {len(nodes)}')
+        if len(nodes)==1:
+            logging.info("Hibernation node is the same as job pod node, pause job just ran, exiting")
+            return 0
 
     if not hibernation_node_id:
         logging.info("No suitable hibernation node found, should make one")
@@ -113,17 +129,15 @@ def handle_suspend():
         for deploy in deploys.items:
             logging.info(f'Additional {namespace} deployment {deploy.metadata.name} will be patched')
             add_special_toleration(client=k8s_v1_apps, deployment=deploy, toleration=castai_pause_toleration)
-
+    time.sleep(30)  # allow core dns and other critical pods to be scheduled on hibernation node
 
     defer_job_node_deletion = False
-    my_node_name_id = ""
-    if my_node_name:
-        logging.info("Job pod node name found: %s", my_node_name)
-        my_node_name_id = get_node_castai_id(client=k8s_v1, node_name=my_node_name)
 
     if my_node_name_id and my_node_name_id != hibernation_node_id:
         logging.info("Job pod node id and hibernation node is not the same")
-        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, protect_removal_disabled, my_node_name_id)
+        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token,
+                                  hibernation_node_id=hibernation_node_id,
+                                  protect_removal_disabled=protect_removal_disabled, job_node_id=my_node_name_id)
         defer_job_node_deletion = True
     else:
         logging.info("Delete all nodes except hibernation node")
@@ -133,7 +147,9 @@ def handle_suspend():
 
     if defer_job_node_deletion:
         logging.info("Delete jobs node with id %s:", my_node_name_id)
-        delete_castai_node(cluster_id, castai_api_token, my_node_name_id)
+        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token,
+                                  hibernation_node_id=hibernation_node_id,
+                                  protect_removal_disabled=protect_removal_disabled)
 
     logging.info("Pause operation completed.")
 
