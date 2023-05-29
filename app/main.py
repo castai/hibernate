@@ -112,6 +112,8 @@ def handle_suspend():
         cordon_all_nodes(k8s_v1, protect_removal_disabled, exclude_node_id=hibernation_node_id)
         time.sleep(20)
     else:
+        logging.info("No suitable hibernation node found, terminating hibernation, resuming autoscaler")
+        handle_resume()
         raise Exception("no ready hibernation node exist")
 
 
