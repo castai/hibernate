@@ -158,7 +158,7 @@ spec:
                   configMapKeyRef:
                     name: castai-cluster-controller
                     key: CLUSTER_ID
-          restartPolicy: Never
+          restartPolicy: OnFailure
       backoffLimit: 0
 ---
 apiVersion: batch/v1
@@ -195,6 +195,6 @@ spec:
                   configMapKeyRef:
                     name: castai-cluster-controller
                     key: CLUSTER_ID
-          restartPolicy: Never
+          restartPolicy: OnFailure
       backoffLimit: 0
 ---
