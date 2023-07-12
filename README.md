@@ -67,9 +67,9 @@ Override default "PROTECT_EVICTION_DISABLED" and set to "true" to prevent the re
 # Development
 
 Create [aks|eks|gke] K8s cluster 
-- create file hack/aks/local.auto.tfvars from example
+- create file hack/aks/tf.vars from example
 - run "make aks"
-- connect to cluster / switch kubectl context
+- connect to cluster (az/gcloud) / switch kubectl context
 
 Run code locally
 - copy cluster_id from console.cast.ai to .env file (example .env.example)

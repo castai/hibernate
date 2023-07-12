@@ -64,6 +64,12 @@ def handle_resume():
 
 
 def handle_suspend():
+    current_policies = get_castai_policy(cluster_id, castai_api_token)
+    if current_policies["enabled"] == False:
+        logging.info("Cluster is already with disabled autoscaler policies, reverting to resume.")
+        handle_resume()
+        return
+
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
 
     my_node_name_id = ""
@@ -77,14 +83,14 @@ def handle_suspend():
         hibernate_node_type = instance_type[cloud]
 
     candidate_node = get_suitable_hibernation_node(cluster_id=cluster_id, castai_api_token=castai_api_token,
-                                                      instance_type=hibernate_node_type, cloud=cloud)
+                                                   instance_type=hibernate_node_type, cloud=cloud)
 
     hibernation_node_id = None
     if candidate_node:
         logging.info("Found suitable hibernation candidate node: %s", candidate_node)
         add_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=candidate_node)
         hibernation_node_id = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
-                                                         node_name=candidate_node)
+                                                               node_name=candidate_node)
 
     if my_node_name_id == hibernation_node_id:
         node_list_result = get_castai_nodes(cluster_id, castai_api_token)
@@ -93,7 +99,7 @@ def handle_suspend():
             if node["state"]["phase"] == "ready":
                 nodes.append(node)
         logging.info(f'Number of READY nodes found in the cluster: {len(nodes)}')
-        if len(nodes)==1:
+        if len(nodes) == 1:
             logging.info("Hibernation node is the same as job pod node, pause job just ran, exiting")
             return 0
 
@@ -102,8 +108,10 @@ def handle_suspend():
         hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_type,
                                                       k8s_taint=castai_pause_toleration, cloud=cloud)
 
+    if not hibernation_node_id:
+        raise Exception("could not create hibernation node")
 
-    node_name=get_castai_node_name_by_id(cluster_id, castai_api_token, hibernation_node_id)
+    node_name = get_castai_node_name_by_id(cluster_id, castai_api_token, hibernation_node_id)
 
     hibernation_node_status = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
                                                                node_name=node_name)
@@ -113,7 +121,6 @@ def handle_suspend():
         time.sleep(20)
     else:
         raise Exception("no ready hibernation node exist")
-
 
     for deploy in get_deployments_names_with_system_priority_class(client=k8s_v1_apps):
         add_special_toleration(client=k8s_v1_apps, deployment=deploy, toleration=castai_pause_toleration)
@@ -161,7 +168,11 @@ def main():
     if action == "resume":
         return handle_resume()
 
-    handle_suspend()
+    try:
+        handle_suspend()
+    except:
+        logging.info("Hibernation failed, resuming cluster")
+        handle_resume()
 
 
 if __name__ == '__main__':
