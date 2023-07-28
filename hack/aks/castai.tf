@@ -38,38 +38,8 @@ module "castai-aks-cluster" {
       subnets         = [azurerm_subnet.internal.id]
       tags            = var.tags
     }
-
-    test_node_config = {
-      disk_cpu_ratio  = 25
-      subnets         = [azurerm_subnet.internal.id]
-      tags            = var.tags
-      max_pods_per_node = 40
-    }
   }
 
-  node_templates = {
-    spot_tmpl = {
-      configuration_id = module.castai-aks-cluster.castai_node_configurations["default"]
-      should_taint = true
-      custom_label = {
-        key = "custom-key"
-        value = "label-value"
-      }
-
-      constraints = {
-        fallback_restore_rate_seconds = 1800
-        spot = true
-        use_spot_fallbacks = true
-        min_cpu = 4
-        max_cpu = 100
-        instance_families = {
-          exclude = ["standard_DPLSv5"]
-        }
-        compute_optimized = false
-        storage_optimized = false
-      }
-    }
-  }
 
   // Configure Autoscaler policies as per API specification https://api.cast.ai/v1/spec/#/PoliciesAPI/PoliciesAPIUpsertClusterPolicies.
   // Here:

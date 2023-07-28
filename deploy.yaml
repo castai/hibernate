@@ -126,6 +126,9 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          annotations:
+            autoscaling.cast.ai/removal-disabled: "true"
         spec:
           tolerations:
           - key: "scheduling.cast.ai/paused-cluster"
@@ -172,6 +175,9 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          annotations:
+            autoscaling.cast.ai/removal-disabled: "true"
         spec:
           priorityClassName: system-cluster-critical
           tolerations:
