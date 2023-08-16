@@ -42,6 +42,11 @@ kubectl get secret castai-hibernate -n castai-agent -o json | jq --arg API_KEY "
 
 AKS is set by default, but requires changing in both CronJobs "Cloud" env variable to [EKS|GKE|AKS]
 
+### Set Schedule 
+
+Modify the `.spec.schedule` parameter for the Hibernate-pause and Hibernate-resume cronjobs according to  [this syntax](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#schedule-syntax). Beginning with Kubernetes v1.25 and later versions, it is possible to define a time zone for a CronJob by assigning a valid time zone name to `.spec.timeZone`. For instance, by assigning `.spec.timeZone: "Etc/UTC"`, Kubernetes will interpret the schedule with respect to Coordinated Universal Time (UTC). To access a list of acceptable time zone options, please refer to the following link: [List of Valid Time Zones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+
+
 ## How it works
 
 Hibernate-pause Job will 
