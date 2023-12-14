@@ -1,5 +1,6 @@
 default: release
 
+PLATFORMS = linux/amd64,linux/arm64
 APP="castai/hibernate"
 TAG_LATEST=$(APP):latest
 TAG_VERSION=$(APP):v0.5
@@ -22,6 +23,11 @@ pull:
 build:
 	@echo "==> Building hibernate container"
 	docker build --cache-from $(TAG_LATEST) --platform linux/amd64 -t $(TAG_LATEST) -t $(TAG_VERSION) .
+
+multiarch:
+	@echo "==> Building hibernate container"
+	docker buildx create --use
+	docker buildx build  --platform $(PLATFORMS)  -t $(TAG_VERSION)  -t $(TAG_LATEST) --push .
 
 publish:
 	@echo "==> pushing to docker hub"
