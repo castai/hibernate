@@ -1,28 +1,42 @@
-variable "castai_api_token" {
+# EKS module variables.
+variable "cluster_name" {
   type        = string
-  description = "CAST.AI api token"
-}
-
-variable "aws_access_key_id" {
-  type        = string
-  description = "Your own access key id for operating terraform"
-}
-
-variable "aws_secret_access_key" {
-  type        = string
-  description = "Your own access key secret for operating terraform"
+  description = "EKS cluster name in AWS account."
 }
 
 variable "cluster_region" {
   type        = string
-  description = "AWS region your cluster is located."
-  default     = "eu-central-1"
+  description = "AWS Region in which EKS cluster and supporting resources will be created."
 }
 
-variable "cluster_name" {
+variable "cluster_version" {
   type        = string
-  description = "EKS cluster name in AWS account."
-  default     = "shrink-cluster-august"
+  description = "EKS cluster version."
+  default     = "1.27"
+}
+
+variable "castai_api_url" {
+  type        = string
+  description = "URL of alternative CAST AI API to be used during development or testing"
+  default     = "https://api.cast.ai"
+}
+
+# Variables required for connecting EKS cluster to CAST AI.
+variable "castai_api_token" {
+  type        = string
+  description = "CAST AI API token created in console.cast.ai API Access keys section"
+}
+
+variable "castai_grpc_url" {
+  type        = string
+  description = "CAST AI gRPC URL"
+  default     = "grpc.cast.ai:443"
+}
+
+variable "delete_nodes_on_disconnect" {
+  type        = bool
+  description = "Optional parameter, if set to true - CAST AI provisioned nodes will be deleted from cloud on cluster disconnection. For production use it is recommended to set it to false."
+  default     = true
 }
 
 variable "tags" {
@@ -31,8 +45,3 @@ variable "tags" {
   default     = {}
 }
 
-variable "delete_nodes_on_disconnect" {
-  type        = bool
-  description = "Optional parameter, if set to true - CAST AI provisioned nodes will be deleted from EC2 on cluster disconnection."
-  default     = false
-}

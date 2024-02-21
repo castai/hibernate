@@ -88,7 +88,7 @@ def check_hibernation_node_readiness(client, taint: str, node_name: str):
         if node_is_ready(node) and not node_has_unexpected_taint(client, taint, node_name):
             logging.info("found tainted hibernation node %s", node_name)
             return node.metadata.labels.get("provisioner.cast.ai/node-id")
-    logging.info("Hibernation node %s is not READY %s", node_name)
+    logging.info("Hibernation node %s is not READY", node_name)
     return None
 
 
