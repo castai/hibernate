@@ -122,6 +122,7 @@ metadata:
   namespace: castai-agent
 spec:
   schedule: "0 22 * * 1-5"
+  timeZone: Etc/UTC
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -171,6 +172,7 @@ metadata:
   namespace: castai-agent
 spec:
   schedule: "0 7 * * 1-5"
+  timeZone: Etc/UTC
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
