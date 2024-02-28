@@ -43,7 +43,7 @@ class Scenario:
 
 
 def test_all():
-    logging.info("TEST test started")
+    logging.info("TEST AKS test started")
     scenario = Scenario()
     scenario.cluster_is_ready()
     scenario.suspend()
