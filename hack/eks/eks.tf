@@ -1,51 +1,80 @@
-#2. create EKS cluster
+# 2. Create EKS cluster.
 module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 18.0"
+  source       = "terraform-aws-modules/eks/aws"
+  version      = "19.4.2"
+  putin_khuylo = true
 
-  cluster_name    = var.cluster_name
-  cluster_version = "1.23"
+  cluster_name                   = var.cluster_name
+  cluster_version                = var.cluster_version
+  cluster_endpoint_public_access = true
 
-  vpc_id  = module.vpc.vpc_id
-  subnets = [module.vpc.private_subnets[0], module.vpc.public_subnets[1]]
-
-  cluster_endpoint_private_access                = true
-  cluster_create_endpoint_private_access_sg_rule = true
-  cluster_endpoint_private_access_cidrs          = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-
-  node_groups_defaults = {
-    ami_type  = "AL2_x86_64"
-    disk_size = 50
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
   }
 
-  workers_group_defaults = {
-    root_volume_type = "gp3"
-  }
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
 
-  worker_additional_security_group_ids = [aws_security_group.all_worker_mgmt.id]
+  manage_aws_auth_configmap = true
 
-  worker_groups = [
-    {
-      name                 = "worker-group-1"
-      instance_type        = "t3.large"
-      asg_desired_capacity = 2
-      additional_security_group_ids = [
-        aws_security_group.worker_group_mgmt_one.id, aws_security_group.worker_group_mgmt_two.id
-      ]
-      eni_delete = "true"
-    },
-  ]
-
-  map_roles = [
-    # ADD - give access to nodes spawned by cast.ai
+  aws_auth_roles = [
+    # Add the CAST AI IAM role which required for CAST AI nodes to join the cluster.
     {
       rolearn  = module.castai-eks-role-iam.instance_profile_role_arn
       username = "system:node:{{EC2PrivateDNSName}}"
-      groups   = ["system:bootstrappers", "system:nodes"]
+      groups = [
+        "system:bootstrappers",
+        "system:nodes",
+      ]
     },
   ]
+
+  self_managed_node_groups = {
+    node_group_1 = {
+      name          = "${var.cluster_name}-ng-1"
+      instance_type = "m5.large"
+      max_size      = 5
+      min_size      = 2
+      desired_size  = 2
+    }
+  }
+
+  eks_managed_node_groups = {
+    node_group_spot = {
+      name         = "${var.cluster_name}-spot"
+      min_size     = 1
+      max_size     = 10
+      desired_size = 1
+
+      instance_types = ["t3.large"]
+      capacity_type  = "SPOT"
+
+      update_config = {
+        max_unavailable_percentage = 50 # or set `max_unavailable`
+      }
+    }
+  }
 }
 
-data "aws_eks_cluster" "eks" {
-  name = module.eks.cluster_id
+# Example additional security group.
+resource "aws_security_group" "additional" {
+  name_prefix = "${var.cluster_name}-additional"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port = 22
+    to_port   = 22
+    protocol  = "tcp"
+    cidr_blocks = [
+      "10.0.0.0/8",
+    ]
+  }
 }

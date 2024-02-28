@@ -85,10 +85,10 @@ def check_hibernation_node_readiness(client, taint: str, node_name: str):
     """ check if node has taint """
     node = client.read_node(node_name)
     if check_if_node_has_specific_taint(client, taint, node_name):
-        if node_is_ready(node):
+        if node_is_ready(node) and not node_has_unexpected_taint(client, taint, node_name):
             logging.info("found tainted hibernation node %s", node_name)
             return node.metadata.labels.get("provisioner.cast.ai/node-id")
-    logging.info("Hibernation node %s is not READY %s", node_name)
+    logging.info("Hibernation node %s is not READY", node_name)
     return None
 
 
@@ -109,6 +109,18 @@ def check_if_node_has_specific_taint(client, taint: str, node_name: str):
         for current_taint in node.spec.taints:
             if current_taint.to_dict()["key"] == taint:
                 logging.info("found tainted node %s", node_name)
+                return True
+    logging.info("Node %s is not tainted", node_name)
+    return False
+
+def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
+    """ check if node has unexpected taint """
+    node = client.read_node(node_name)
+
+    if node.spec.taints:
+        for current_taint in node.spec.taints:
+            if current_taint.to_dict()["key"] != valid_taint_key:
+                logging.info("unexpected taint found on node %s", node_name)
                 return True
     logging.info("Node %s is not tainted", node_name)
     return False
