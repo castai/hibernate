@@ -162,8 +162,9 @@ def handle_suspend():
 
 
 def main():
-    logging.info("Hibernation input parameters token: %s, clusterId: %s, cloud: %s, action: %s",
-                 castai_api_token, cluster_id, cloud, action)
+
+    logging.info("Hibernation input parameters clusterId: %s, cloud: %s, action: %s",
+                 cluster_id, cloud, action)
 
     if action == "resume":
         return handle_resume()
