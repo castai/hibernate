@@ -6,8 +6,8 @@ from kubernetes import client, config
 from dotenv import load_dotenv
 from pathlib import Path
 
-# local_development = os.environ.get("LOCAL_DEVELOPMENT")
-local_development = True
+local_development = os.environ.get("LOCAL_DEVELOPMENT")
+# local_development = True
 
 if not local_development:
     # Run hibernate from container inside k8s
@@ -53,7 +53,7 @@ cloud_labels = {
     "AKS": "kubernetes.azure.com/mode"
 }
 
-cloud = get_cloud_provider(k8s_v1, my_node_name, cloud_labels)
+cloud = get_cloud_provider(k8s_v1, cloud_labels)
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")

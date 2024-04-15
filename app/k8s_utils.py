@@ -222,19 +222,23 @@ def has_system_priority_class(deployment):
     else:
         return False
 
-@basic_retry(attempts=3, pause=15)
-def get_cloud_provider(client, node_name: str, cloud_provider_label: dict):
+
+def get_cloud_provider(client, cloud_provider_label: dict):
     for cloud, label_key in cloud_provider_label.items():
-        if check_if_node_has_csp_specific_label(client, node_name, label_key):
-            logging.info(f"Cloud auto-detected {label_key} on node {node_name}")
+        node = check_if_node_has_csp_specific_label(client, label_key)
+        if len(node) > 0:
+            logging.info(f"Cloud auto-detected {label_key} on node {node}")
             return cloud
+    logging.warning(f"Cloud  NOT detected on node {node}, falling back to env var CLOUD")
     return os.environ["CLOUD"]
 
-def check_if_node_has_csp_specific_label(client, node_name: str, label_key: str):
-    """ check if node has taint """
-    node = client.read_node(node_name)
+@basic_retry(attempts=3, pause=15)
+def check_if_node_has_csp_specific_label(client,  label_key: str):
+    """ check if node has label by key """
 
-    if node.metadata.labels.get(label_key):
-        logging.info(f"found label {label_key} on node {node_name}")
-        return True
+    node_list = client.list_node()
+    for node in node_list.items:
+        if node.metadata.labels.get(label_key):
+            logging.info(f"found label {label_key} on node {node.metadata.name}")
+            return node.metadata.name
     return False

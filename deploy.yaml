@@ -147,8 +147,6 @@ spec:
                 valueFrom:
                   fieldRef:
                     fieldPath: spec.nodeName
-              - name: CLOUD
-                value: "AKS"
               - name: HIBERNATE_NODE
                 value: ""
               - name: NAMESPACES_TO_KEEP
@@ -194,8 +192,6 @@ spec:
               - secretRef:
                   name: castai-hibernate
             env:
-              - name: CLOUD
-                value: "AKS"
               - name: ACTION
                 value: "resume"
               - name: CLUSTER_ID
