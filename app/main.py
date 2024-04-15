@@ -24,7 +24,7 @@ k8s_v1_apps = client.AppsV1Api()
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
 hibernate_node_type_override = os.environ.get("HIBERNATE_NODE")
-cloud = os.environ["CLOUD"]
+
 action = os.environ["ACTION"]
 user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
 protect_removal_disabled = os.environ.get("PROTECT_REMOVAL_DISABLED")
@@ -48,11 +48,12 @@ instance_type = {
 }
 
 cloud_labels = {
-    "GKE": None,
-    "EKS": None,
-    "AKS": "kubernetes.azure.com/mode=system"
+    "GKE": "topology.gke.io/zone",
+    "EKS": "k8s.io/cloud-provider-aws",
+    "AKS": "kubernetes.azure.com/mode"
 }
 
+cloud = get_cloud_provider(k8s_v1, cloud_labels)
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")

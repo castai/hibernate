@@ -1,4 +1,6 @@
 import logging
+import os
+
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
 
@@ -219,3 +221,24 @@ def has_system_priority_class(deployment):
         return True
     else:
         return False
+
+
+def get_cloud_provider(client, cloud_provider_label: dict):
+    for cloud, label_key in cloud_provider_label.items():
+        node = check_if_node_has_csp_specific_label(client, label_key)
+        if len(node) > 0:
+            logging.info(f"Cloud auto-detected {label_key} on node {node}")
+            return cloud
+    logging.warning(f"Cloud  NOT detected on node {node}, falling back to env var CLOUD")
+    return os.environ["CLOUD"]
+
+@basic_retry(attempts=3, pause=15)
+def check_if_node_has_csp_specific_label(client,  label_key: str):
+    """ check if node has label by key """
+
+    node_list = client.list_node()
+    for node in node_list.items:
+        if node.metadata.labels.get(label_key):
+            logging.info(f"found label {label_key} on node {node.metadata.name}")
+            return node.metadata.name
+    return False
