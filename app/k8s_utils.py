@@ -4,6 +4,7 @@ import os
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
 
+
 class K8sAPIError(Exception):
     pass
 
@@ -22,7 +23,8 @@ def cordon_all_nodes(client, protect_removal_disabled: str, exclude_node_id: str
     node_list = client.list_node()
     for node in node_list.items:
         logging.info("Inspecting node %s to cordon", node.metadata.name)
-        if node.metadata.labels.get("autoscaling.cast.ai/removal-disabled") == "true" and protect_removal_disabled == "true":
+        if node.metadata.labels.get(
+                "autoscaling.cast.ai/removal-disabled") == "true" and protect_removal_disabled == "true":
             logging.info("skip Cordoning node: %s due protect_removal_disabled label" % node.metadata.name)
             continue
         if node.metadata.labels.get("provisioner.cast.ai/node-id") == exclude_node_id:
@@ -103,6 +105,7 @@ def node_is_ready(node: str):
             return True
     return False
 
+
 def check_if_node_has_specific_taint(client, taint: str, node_name: str):
     """ check if node has taint """
     node = client.read_node(node_name)
@@ -115,6 +118,7 @@ def check_if_node_has_specific_taint(client, taint: str, node_name: str):
     logging.info("Node %s is not tainted", node_name)
     return False
 
+
 def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
     """ check if node has unexpected taint """
     node = client.read_node(node_name)
@@ -126,6 +130,7 @@ def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
                 return True
     logging.info("Node %s is not tainted", node_name)
     return False
+
 
 @basic_retry(attempts=2, pause=5)
 def add_node_taint(client, pause_taint: str, node_name):
@@ -221,24 +226,3 @@ def has_system_priority_class(deployment):
         return True
     else:
         return False
-
-
-def get_cloud_provider(client, cloud_provider_label: dict):
-    for cloud, label_key in cloud_provider_label.items():
-        node = check_if_node_has_csp_specific_label(client, label_key)
-        if node is not None:
-            logging.info(f"Cloud auto-detected {label_key} on node {node}")
-            return cloud
-    logging.warning(f"Cloud  NOT detected on node {node}, falling back to env var CLOUD")
-    return os.environ["CLOUD"]
-
-@basic_retry(attempts=3, pause=15)
-def check_if_node_has_csp_specific_label(client,  label_key: str):
-    """ check if node has label by key """
-
-    node_list = client.list_node()
-    for node in node_list.items:
-        if node.metadata.labels.get(label_key):
-            logging.info(f"found label {label_key} on node {node.metadata.name}")
-            return node.metadata.name
-    return None

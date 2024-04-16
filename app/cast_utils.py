@@ -38,6 +38,7 @@ def set_castai_policy(cluster_id, castai_api_token, updated_policies):
     if resp.status_code == 200:
         return resp.json()
 
+
 @basic_retry(attempts=2, pause=5)
 def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_value: bool):
     """" Disable CAST autoscaler to prevent adding new nodes automatically"""
@@ -60,6 +61,7 @@ def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_va
     else:
         logging.info("skip policy update")
         return True
+
 
 @basic_retry(attempts=3, pause=5)
 def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, k8s_taint: str, cloud: str):
@@ -123,8 +125,10 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
             time.sleep(60)
         return nodeId
 
+
 @basic_retry(attempts=4, pause=15)
-def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str, protect_removal_disabled: str, job_node_id=None):
+def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str,
+                              protect_removal_disabled: str, job_node_id=None):
     """" Delete all nodes through CAST AI mothership excluding hibernation node"""
     node_list_result = get_castai_nodes(cluster_id, castai_api_token)
     for node in node_list_result["items"]:
@@ -132,8 +136,8 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
         if node["id"] == hibernation_node_id or node["id"] == job_node_id:
             logging.info("Skipping temp node: %s " % node["id"])
             continue
-        if node["labels"].get("autoscaling.cast.ai/removal-disabled") == "true" and protect_removal_disabled=="true":
-            logging.info("Skipping node protected by removal-disabled ID: %s " %node["id"])
+        if node["labels"].get("autoscaling.cast.ai/removal-disabled") == "true" and protect_removal_disabled == "true":
+            logging.info("Skipping node protected by removal-disabled ID: %s " % node["id"])
             continue
         logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
         delete_castai_node(cluster_id, castai_api_token, node["id"])
@@ -153,7 +157,7 @@ def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_token: str, in
 def get_suitable_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, cloud: str):
     cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_token, instance_type=instance_type)
     for node in sorted(cast_nodes, key=lambda k: k['createdAt']):
-        if cloud == "AKS": # Azure special case use system node
+        if cloud == "AKS":  # Azure special case use system node
             if node["labels"].get("kubernetes.azure.com/mode") == "system":
                 logging.info("Suitable system node found: %s" % node["name"])
                 return node["name"]
@@ -186,6 +190,7 @@ def get_castai_node_name_by_id(cluster_id, castai_api_token, node_id):
         else:
             return False
 
+
 @basic_retry(attempts=3, pause=30)
 def delete_castai_node(cluster_id, castai_api_token, node_id):
     """ Delete single node"""
@@ -204,3 +209,13 @@ def delete_castai_node(cluster_id, castai_api_token, node_id):
         return True
     else:
         return False
+
+
+def get_cluster_details(cluster_id, castai_api_token):
+    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}".format
+    header_dict = {"accept": "application/json",
+                   "X-API-Key": castai_api_token}
+
+    resp = requests.get(url=url(cluster_id), headers=header_dict)
+    if resp.status_code == 200:
+        return resp.json()
