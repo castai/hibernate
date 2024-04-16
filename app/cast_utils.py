@@ -204,3 +204,13 @@ def delete_castai_node(cluster_id, castai_api_token, node_id):
         return True
     else:
         return False
+
+
+def get_cluster_details(cluster_id, castai_api_token):
+    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}".format
+    header_dict = {"accept": "application/json",
+                   "X-API-Key": castai_api_token}
+
+    resp = requests.get(url=url(cluster_id), headers=header_dict)
+    if resp.status_code == 200:
+        return resp.json()
