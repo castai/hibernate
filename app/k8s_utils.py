@@ -226,7 +226,7 @@ def has_system_priority_class(deployment):
 def get_cloud_provider(client, cloud_provider_label: dict):
     for cloud, label_key in cloud_provider_label.items():
         node = check_if_node_has_csp_specific_label(client, label_key)
-        if len(node) > 0:
+        if node is not None:
             logging.info(f"Cloud auto-detected {label_key} on node {node}")
             return cloud
     logging.warning(f"Cloud  NOT detected on node {node}, falling back to env var CLOUD")
@@ -241,4 +241,4 @@ def check_if_node_has_csp_specific_label(client,  label_key: str):
         if node.metadata.labels.get(label_key):
             logging.info(f"found label {label_key} on node {node.metadata.name}")
             return node.metadata.name
-    return False
+    return None
