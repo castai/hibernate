@@ -6,6 +6,9 @@ from kubernetes import client, config
 from dotenv import load_dotenv
 from pathlib import Path
 
+logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
+logging.info("Starting hibernate")
+
 local_development = os.environ.get("LOCAL_DEVELOPMENT")
 # local_development = True
 
@@ -30,7 +33,6 @@ user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
 protect_removal_disabled = os.environ.get("PROTECT_REMOVAL_DISABLED")
 
 my_node_name = os.environ.get("MY_NODE_NAME")
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO)
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
 spot_fallback = "scheduling.cast.ai/spot-fallback"
@@ -53,7 +55,6 @@ cloud_labels = {
     "AKS": "kubernetes.azure.com/mode"
 }
 
-cloud = get_cloud_provider(k8s_v1, cloud_labels)
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")
@@ -64,12 +65,13 @@ def handle_resume():
     logging.info("Resume operation completed.")
 
 
-def handle_suspend():
+def handle_suspend(cloud):
     current_policies = get_castai_policy(cluster_id, castai_api_token)
     if current_policies["enabled"] == False:
         logging.info("Cluster is already with disabled autoscaler policies, reverting to resume.")
         handle_resume()
-        time.sleep(120) # allow autoscaler to handle actions required to schedule existing workloads and cleanup empty nodes
+        time.sleep(
+            120)  # allow autoscaler to handle actions required to schedule existing workloads and cleanup empty nodes
 
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
 
@@ -162,7 +164,23 @@ def handle_suspend():
     logging.info("Pause operation completed.")
 
 
+def get_cloud_provider(cluster_id: str, castai_api_token):
+    '''Detect cloud provider from CAST AI, then node labels or fallback to env var CLOUD'''
+
+    cloud_var = get_cluster_details(cluster_id, castai_api_token)["providerType"].upper()
+    if cloud_var is not None:
+        logging.info(f"Cloud %s auto-detected from CAST AI cluster details API", cloud_var)
+        return cloud_var
+
+    logging.warning(f"Cloud NOT detected, falling back to env var CLOUD")
+    return os.environ["CLOUD"]
+
+
 def main():
+    cloud = get_cloud_provider(cluster_id, castai_api_token)
+    if cloud is None:
+        raise Exception("could not detect cloud provider")
+        exit(1)
 
     logging.info("Hibernation input parameters clusterId: %s, cloud: %s, action: %s",
                  cluster_id, cloud, action)
@@ -171,7 +189,7 @@ def main():
         return handle_resume()
 
     try:
-        handle_suspend()
+        handle_suspend(cloud)
     except:
         logging.info("Hibernation failed, resuming cluster")
         handle_resume()
