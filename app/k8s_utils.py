@@ -226,3 +226,7 @@ def has_system_priority_class(deployment):
         return True
     else:
         return False
+
+def last_run_dirty():
+
+    pass

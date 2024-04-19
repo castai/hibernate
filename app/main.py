@@ -68,10 +68,11 @@ def handle_resume():
 def handle_suspend(cloud):
     current_policies = get_castai_policy(cluster_id, castai_api_token)
     if current_policies["enabled"] == False:
-        logging.info("Cluster is already with disabled autoscaler policies, reverting to resume.")
-        handle_resume()
-        time.sleep(
-            120)  # allow autoscaler to handle actions required to schedule existing workloads and cleanup empty nodes
+        if last_run_dirty():
+            logging.info("Cluster is already with disabled autoscaler policies, reverting to resume.")
+            handle_resume()
+            time.sleep(120)  # allow autoscaler to handle actions required to schedule existing workloads and cleanup empty nodes
+
 
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
 
