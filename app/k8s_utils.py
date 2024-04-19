@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
@@ -227,6 +228,55 @@ def has_system_priority_class(deployment):
     else:
         return False
 
-def last_run_dirty():
+def last_run_dirty(client, cm: str, ns: str):
+    """ check if last run was dirty """
+    # last_run_status, last_run_time = read_configMap(client, cm, ns)
+    #
+    # if last_run_status == "success":
+    #     return True
+    return False
 
-    pass
+
+def read_configMap (client, cm, ns):
+    try:
+        config_map = client.read_namespaced_config_map(name=cm, namespace=ns)
+        last_run_status = config_map.data.get("last_run_status")
+        last_run_time = config_map.data.get("last_run_time")
+        if last_run_status is not None and last_run_time is not None:
+            return last_run_status, last_run_time
+        else:
+            return None, None
+    except client.rest.ApiException as e:
+        logging.error(f"Exception when calling CoreV1Api->read_namespaced_config_map: {e}")
+        return None, None
+
+
+def update_last_run_status_and_time(client, config_map_name, namespace, status):
+    try:
+        # Get the current date and time
+        now = datetime.now()
+        # Format it as a string
+        current_time = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+        # Prepare the data to update
+        data = {
+            "last_run_status": status,
+            "last_run_time": current_time
+        }
+
+        # Prepare the body of the ConfigMap
+        body = {
+            "data": data
+        }
+
+        # Update the ConfigMap
+        config_map = client.patch_namespaced_config_map(
+            name=config_map_name,
+            namespace=namespace,
+            body=body
+        )
+
+        return config_map
+    except client.rest.ApiException as e:
+        logging.error(f"Exception when calling CoreV1Api->patch_namespaced_config_map: {e}")
+        return None
