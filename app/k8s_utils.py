@@ -91,7 +91,9 @@ def check_hibernation_node_readiness(client, taint: str, node_name: str):
     node = client.read_node(node_name)
     if check_if_node_has_specific_taint(client, taint, node_name):
         if node_is_ready(node) and not node_has_unexpected_taint(client, taint, node_name):
-            logging.info("check_hibernation_node_readiness: found hibernation node %s with valid taint %s and no other unexpected taints", node_name, taint)
+            logging.info(
+                "check_hibernation_node_readiness: found hibernation node %s with valid taint %s and no other unexpected taints",
+                node_name, taint)
             return node.metadata.labels.get("provisioner.cast.ai/node-id")
     logging.info("Hibernation node %s is not READY", node_name)
     return None
@@ -228,22 +230,24 @@ def has_system_priority_class(deployment):
     else:
         return False
 
+
 def last_run_dirty(client, cm: str, ns: str):
     """ check if last run was dirty """
     last_run_status, last_run_time = read_configMap(client, cm, ns)
-
+    logging.info("last_run_dirty: last_run_status %s, last_run_time %s", last_run_status, last_run_time)
     if last_run_status == "success":
         return False
     else:
         # check if last_run_time is older than 12 hours
         last_run_time = datetime.strptime(last_run_time, "%Y-%m-%dT%H:%M:%S")
         now = datetime.now()
-        if (now - last_run_time).total_seconds() > 43200: # 12 hours
+        if (now - last_run_time).total_seconds() > 43200:  # 12 hours
             return False
     return True
 
+
 @basic_retry(attempts=3, pause=15)
-def read_configMap(client, cm, ns):
+def read_configMap(client, cm: str, ns: str):
     try:
         config_map = client.read_namespaced_config_map(name=cm, namespace=ns)
         last_run_status = config_map.data.get("last_run_status")
@@ -256,32 +260,20 @@ def read_configMap(client, cm, ns):
         logging.error(f"Exception when calling CoreV1Api->read_namespaced_config_map: {e}")
         return None, None
 
+
 @basic_retry(attempts=3, pause=15)
 def update_last_run_status(client, cm: str, ns: str, status: str):
     # Get the current date and time
-    now = datetime.now()
-
-    # current_time format not string
-
-    current_time = now.strftime("%Y-%m-%dT%H:%M:%S")
+    current_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     logging.info("updating configMap status to %s at %s", status, current_time)
-    # Prepare the data to update
+
     data = {
         "last_run_status": status,
         "last_run_time": current_time
     }
 
-    # Prepare the body of the ConfigMap
     body = {
         "data": data
     }
     logging.info(f"configMap body to {body}")
-    # Update the ConfigMap
-    configMap_patch_result = client.patch_namespaced_config_map(
-        name=cm,
-        namespace=ns,
-        body=body
-    )
-    # logging.info(f"configMap patching result {configMap_patch_result}")
-
-    return True
+    client.patch_namespaced_config_map(name=cm, namespace=ns, body=body)
