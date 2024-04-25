@@ -35,7 +35,7 @@ protect_removal_disabled = os.environ.get("PROTECT_REMOVAL_DISABLED")
 my_node_name = os.environ.get("MY_NODE_NAME")
 
 ns = "castai-agent"
-configmap_name = "hibernate-state"
+configmap_name = "castai-hibernate-state"
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
 spot_fallback = "scheduling.cast.ai/spot-fallback"
@@ -72,10 +72,14 @@ def handle_suspend(cloud):
     current_policies = get_castai_policy(cluster_id, castai_api_token)
     if current_policies["enabled"] == False:
         if last_run_dirty(client=k8s_v1, cm=configmap_name, ns=ns):
-            logging.info("Cluster is already with disabled autoscaler policies, reverting to resume.")
-            handle_resume()
-            time.sleep(240)  # allow autoscaler to handle actions required to schedule existing workloads and cleanup empty nodes
-
+            raise Exception("Cluster is already paused, but last run was dirty, clean configMap to retry or wait 12h")
+        else:
+            time.sleep(300)  # avoid double running
+            nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token)
+            logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
+            assert len(nodes["items"]) == 1, "Incorrect number of nodes after suspend"
+            logging.info("Cluster is already with disabled autoscaler policies, exiting.")
+            return 0
 
     toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
 
@@ -165,7 +169,11 @@ def handle_suspend(cloud):
                                   hibernation_node_id=hibernation_node_id,
                                   protect_removal_disabled=protect_removal_disabled)
 
+    # if cluster_ready(cluster_id=cluster_id, castai_api_token=castai_api_token):
+    update_last_run_status(client=k8s_v1, cm=configmap_name, ns=ns, status="success")
     logging.info("Pause operation completed.")
+    # else:
+    #     raise Exception("Pause finished, but cluster is not ready")
 
 
 def get_cloud_provider(cluster_id: str, castai_api_token):
@@ -197,6 +205,7 @@ def main():
     except:
         logging.info("Hibernation failed, resuming cluster")
         handle_resume()
+        update_last_run_status(client=k8s_v1, cm=configmap_name, ns=ns, status="failed")
 
 
 if __name__ == '__main__':

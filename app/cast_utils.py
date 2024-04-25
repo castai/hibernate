@@ -9,6 +9,7 @@ class NetworkError(Exception):
     pass
 
 
+@basic_retry(attempts=3, pause=5)
 def get_cluster_status(clusterid, castai_apitoken):
     url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}".format
     header_dict = {"accept": "application/json",
@@ -17,6 +18,15 @@ def get_cluster_status(clusterid, castai_apitoken):
     resp = requests.get(url=url(clusterid), headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
+
+
+@basic_retry(attempts=3, pause=5)
+def cluster_ready(clusterid, castai_apitoken):
+    cluster = get_cluster_status(clusterid, castai_apitoken)
+    logging.info(f"TEST cluster status: {cluster.get('status')}, id: {cluster.get('id')}")
+    if cluster.get('status') == 'ready':
+        return True
+    return False
 
 
 def get_castai_policy(cluster_id, castai_api_token):

@@ -91,7 +91,7 @@ def check_hibernation_node_readiness(client, taint: str, node_name: str):
     node = client.read_node(node_name)
     if check_if_node_has_specific_taint(client, taint, node_name):
         if node_is_ready(node) and not node_has_unexpected_taint(client, taint, node_name):
-            logging.info("found tainted hibernation node %s", node_name)
+            logging.info("check_hibernation_node_readiness: found hibernation node %s with valid taint %s and no other unexpected taints", node_name, taint)
             return node.metadata.labels.get("provisioner.cast.ai/node-id")
     logging.info("Hibernation node %s is not READY", node_name)
     return None
@@ -114,7 +114,7 @@ def check_if_node_has_specific_taint(client, taint: str, node_name: str):
     if node.spec.taints:
         for current_taint in node.spec.taints:
             if current_taint.to_dict()["key"] == taint:
-                logging.info("found tainted node %s", node_name)
+                logging.info("check_if_node_has_specific_taint: found node %s with taint %s", node_name, taint)
                 return True
     logging.info("Node %s is not tainted", node_name)
     return False
@@ -129,7 +129,7 @@ def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
             if current_taint.to_dict()["key"] != valid_taint_key:
                 logging.info("unexpected taint found on node %s", node_name)
                 return True
-    logging.info("Node %s is not tainted", node_name)
+    logging.info("Node %s does not have unexpected taint", node_name)
     return False
 
 
@@ -230,14 +230,20 @@ def has_system_priority_class(deployment):
 
 def last_run_dirty(client, cm: str, ns: str):
     """ check if last run was dirty """
-    # last_run_status, last_run_time = read_configMap(client, cm, ns)
-    #
-    # if last_run_status == "success":
-    #     return True
-    return False
+    last_run_status, last_run_time = read_configMap(client, cm, ns)
 
+    if last_run_status == "success":
+        return False
+    else:
+        # check if last_run_time is older than 12 hours
+        last_run_time = datetime.strptime(last_run_time, "%Y-%m-%dT%H:%M:%S")
+        now = datetime.now()
+        if (now - last_run_time).total_seconds() > 43200: # 12 hours
+            return False
+    return True
 
-def read_configMap (client, cm, ns):
+@basic_retry(attempts=3, pause=15)
+def read_configMap(client, cm, ns):
     try:
         config_map = client.read_namespaced_config_map(name=cm, namespace=ns)
         last_run_status = config_map.data.get("last_run_status")
@@ -250,33 +256,32 @@ def read_configMap (client, cm, ns):
         logging.error(f"Exception when calling CoreV1Api->read_namespaced_config_map: {e}")
         return None, None
 
+@basic_retry(attempts=3, pause=15)
+def update_last_run_status(client, cm: str, ns: str, status: str):
+    # Get the current date and time
+    now = datetime.now()
 
-def update_last_run_status_and_time(client, config_map_name, namespace, status):
-    try:
-        # Get the current date and time
-        now = datetime.now()
-        # Format it as a string
-        current_time = now.strftime("%Y-%m-%dT%H:%M:%S")
+    # current_time format not string
 
-        # Prepare the data to update
-        data = {
-            "last_run_status": status,
-            "last_run_time": current_time
-        }
+    current_time = now.strftime("%Y-%m-%dT%H:%M:%S")
+    logging.info("updating configMap status to %s at %s", status, current_time)
+    # Prepare the data to update
+    data = {
+        "last_run_status": status,
+        "last_run_time": current_time
+    }
 
-        # Prepare the body of the ConfigMap
-        body = {
-            "data": data
-        }
+    # Prepare the body of the ConfigMap
+    body = {
+        "data": data
+    }
+    logging.info(f"configMap body to {body}")
+    # Update the ConfigMap
+    configMap_patch_result = client.patch_namespaced_config_map(
+        name=cm,
+        namespace=ns,
+        body=body
+    )
+    # logging.info(f"configMap patching result {configMap_patch_result}")
 
-        # Update the ConfigMap
-        config_map = client.patch_namespaced_config_map(
-            name=config_map_name,
-            namespace=namespace,
-            body=body
-        )
-
-        return config_map
-    except client.rest.ApiException as e:
-        logging.error(f"Exception when calling CoreV1Api->patch_namespaced_config_map: {e}")
-        return None
+    return True
