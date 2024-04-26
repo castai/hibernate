@@ -1,9 +1,9 @@
 import logging
 import os
 from datetime import datetime
-
 from utils import basic_retry
 from kubernetes.client.rest import ApiException
+from kubernetes import client as rawclient
 
 
 class K8sAPIError(Exception):
@@ -256,7 +256,22 @@ def read_configMap(client, cm: str, ns: str):
             return last_run_status, last_run_time
         else:
             return None, None
-    except client.rest.ApiException as e:
+    except ApiException as e:
+        if e.status == 404:
+            logging.info("read_configMap: ConfigMap not found, creating a new one.")
+            # Define the new ConfigMap
+            new_config_map = rawclient.V1ConfigMap(
+                metadata=rawclient.V1ObjectMeta(name=cm),
+                data={
+                    "last_run_status": "success",
+                    "last_run_time": "1900-01-01T01:00:00"
+                }
+            )
+
+            created_config_map = client.create_namespaced_config_map(namespace=ns, body=new_config_map)
+            print("Created ConfigMap:", created_config_map)
+        else:
+            print("Failed to read ConfigMap due to an unexpected error:", e)
         logging.error(f"Exception when calling CoreV1Api->read_namespaced_config_map: {e}")
         return None, None
 
