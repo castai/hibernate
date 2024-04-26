@@ -2,7 +2,7 @@ default: release
 
 PLATFORMS = linux/amd64,linux/arm64
 APP="castai/hibernate"
-TAG_LATEST=$(APP):test
+TAG_LATEST=$(APP):latest
 TAG_VERSION=$(APP):v0.9
 
 gke:

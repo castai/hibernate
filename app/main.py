@@ -9,8 +9,8 @@ from pathlib import Path
 logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
 logging.info("Starting hibernate")
 
-# local_development = os.environ.get("LOCAL_DEVELOPMENT")
-local_development = True
+local_development = os.environ.get("LOCAL_DEVELOPMENT")
+# local_development = True
 
 if not local_development:
     # Run hibernate from container inside k8s
