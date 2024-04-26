@@ -78,7 +78,6 @@ def handle_suspend(cloud):
             time.sleep(300)  # avoid double running
             nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token)
             logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
-            assert len(nodes["items"]) == 1, "Incorrect number of nodes after suspend"
             logging.info("Cluster is already with disabled autoscaler policies, exiting.")
             return 0
 

@@ -269,11 +269,10 @@ def read_configMap(client, cm: str, ns: str):
             )
 
             created_config_map = client.create_namespaced_config_map(namespace=ns, body=new_config_map)
-            print("Created ConfigMap:", created_config_map)
+            raise Exception("ConfigMap creating; retrying to read.")
         else:
-            print("Failed to read ConfigMap due to an unexpected error:", e)
-        logging.error(f"Exception when calling CoreV1Api->read_namespaced_config_map: {e}")
-        return None, None
+            logging.error(f"Failed to read ConfigMap due to an unexpected error: {e}")
+            raise e
 
 
 @basic_retry(attempts=3, pause=15)
