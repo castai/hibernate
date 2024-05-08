@@ -9,6 +9,15 @@ data:
     Q0FTVEFJLUFQSS1LRVktUkVQTEFDRS1NRS1XSVRILUFCT1ZFLg==
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: castai-hibernate-state
+  namespace: castai-agent
+data:
+  last_run_status: "success"
+  last_run_time: "2022-01-01T00:00:00Z"
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: hibernate

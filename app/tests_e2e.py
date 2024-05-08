@@ -1,8 +1,10 @@
 import logging
 import sys
 import time
-from main import handle_suspend, handle_resume, get_cloud_provider, cluster_id, castai_api_token
+from main import handle_suspend, handle_resume, get_cloud_provider, cluster_id, castai_api_token, ns, configmap_name, \
+    k8s_v1
 from cast_utils import get_cluster_status, get_castai_nodes, get_castai_policy
+from k8s_utils import read_configMap
 from utils import step
 
 logger = logging.getLogger()
@@ -15,11 +17,13 @@ logger.addHandler(handler)
 
 
 class Scenario:
-    def __init__(self, cluster_id, castai_api_token):
+    def __init__(self, cluster_id, castai_api_token, ns, configmap_name, k8s_v1):
         self.cluster_id = cluster_id
         self.castai_api_token = castai_api_token
+        self.ns = ns
+        self.cm = configmap_name
+        self.k8s_v1 = k8s_v1
         self.cloud = get_cloud_provider(cluster_id=self.cluster_id, castai_api_token=self.castai_api_token)
-
 
     @step
     def cluster_is_ready(self):
@@ -32,32 +36,49 @@ class Scenario:
         logging.info(f'Cloud detect: {self.cloud}')
         assert self.cloud in ('EKS', 'GKE', 'AKS'), f"Unexpected cloud: {self.cloud}"
 
+    def configmap_read(self):
+        logging.info(f"TEST configmap missing")
+
+        status, datetime = read_configMap(self.k8s_v1, cm=self.cm, ns=self.ns)
+        assert status is not None, "Configmap can be read"
+
     @step
     def suspend(self):
         logging.info(f"TEST suspending cluster")
         handle_suspend(self.cloud)
 
-        time.sleep(300) # sometimes delete nodes takes longer time
+        time.sleep(300)  # sometimes delete nodes takes longer time
         nodes = get_castai_nodes(self.cluster_id, self.castai_api_token)
         logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
-        assert len(nodes["items"])==1, "Incorrect number of nodes after suspend"
+        assert len(nodes["items"]) == 1, "Incorrect number of nodes after suspend"
 
+    def double_suspend(self):
+        logging.info(f"TEST suspending already suspended cluster")
+        handle_suspend(self.cloud)
+
+        time.sleep(30)  # make sure nodes are not about to be added
+        current_policies = get_castai_policy(self.cluster_id, self.castai_api_token)
+        nodes = get_castai_nodes(self.cluster_id, self.castai_api_token)
+        logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
+        assert len(nodes["items"]) == 1 and not current_policies["enabled"], "Incorrect number of nodes after suspend"
 
     @step
     def resume(self):
         logging.info(f"TEST resuming cluster")
         handle_resume()
-        policy_json = get_castai_policy(self.cluster_id, self.castai_api_token)
-        assert policy_json["enabled"], "Policy not enabled after resume"
+        current_policies = get_castai_policy(self.cluster_id, self.castai_api_token)
+        assert current_policies["enabled"], "Policy not enabled after resume"
 
 
 def test_all():
     logging.info("TEST test started")
-    scenario = Scenario(cluster_id, castai_api_token)
+    scenario = Scenario(cluster_id, castai_api_token, ns, configmap_name, k8s_v1)
     scenario.cluster_is_ready()
     scenario.get_cloud()
+    scenario.configmap_read()
     scenario.suspend()
     time.sleep(15)
+    scenario.double_suspend()
     scenario.cluster_is_ready()
     time.sleep(15)
     scenario.resume()
