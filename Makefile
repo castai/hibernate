@@ -3,7 +3,7 @@ default: release
 PLATFORMS = linux/amd64,linux/arm64
 APP="castai/hibernate"
 TAG_LATEST=$(APP):latest
-TAG_VERSION=$(APP):v0.9
+TAG_VERSION=$(APP):v0.10
 
 gke:
 	(cd ./hack/gke && terraform init && terraform apply -auto-approve)
