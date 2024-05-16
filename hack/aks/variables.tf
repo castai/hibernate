@@ -12,14 +12,25 @@ variable "cluster_region" {
 variable "cluster_version" {
   type        = string
   description = "AKS cluster version."
-  default     = "1.23"
+  default     = "1.27"
 }
 
+variable "castai_api_url" {
+  type        = string
+  description = "URL of alternative CAST AI API to be used during development or testing"
+  default     = "https://api.cast.ai"
+}
 
 # Variables required for connecting EKS cluster to CAST AI
 variable "castai_api_token" {
-  type = string
+  type        = string
   description = "CAST AI API token created in console.cast.ai API Access keys section"
+}
+
+variable "castai_grpc_url" {
+  type        = string
+  description = "CAST AI gRPC URL"
+  default     = "grpc.cast.ai:443"
 }
 
 variable "delete_nodes_on_disconnect" {

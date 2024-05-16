@@ -9,6 +9,8 @@ from kubernetes import client as rawclient
 class K8sAPIError(Exception):
     pass
 
+class TaintException(Exception):
+    pass
 
 @basic_retry(attempts=3, pause=10)
 def cordon_all_nodes(client, protect_removal_disabled: str, exclude_node_id: str):
@@ -121,15 +123,17 @@ def check_if_node_has_specific_taint(client, taint: str, node_name: str):
     logging.info("Node %s is not tainted", node_name)
     return False
 
-
+@basic_retry(attempts=3, pause=30)
 def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
     """ check if node has unexpected taint """
     node = client.read_node(node_name)
 
     if node.spec.taints:
         for current_taint in node.spec.taints:
+            if current_taint.to_dict()["key"] == "node.kubernetes.io/network-unavailable":
+                raise TaintException("Taint 'node.kubernetes.io/network-unavailable' found. Retrying...") # retry if network is unavailable
             if current_taint.to_dict()["key"] != valid_taint_key:
-                logging.info("unexpected taint found on node %s", node_name)
+                logging.info("unexpected taint found %s on node %s", current_taint.to_dict()["key"], node_name)
                 return True
     logging.info("Node %s does not have unexpected taint", node_name)
     return False
@@ -257,7 +261,7 @@ def read_configMap(client, cm: str, ns: str):
         else:
             return None, None
     except ApiException as e:
-        if e.status == 404:
+        if e.status == 404 or e.code == 404:
             logging.info("read_configMap: ConfigMap not found, creating a new one.")
             # Define the new ConfigMap
             new_config_map = rawclient.V1ConfigMap(
