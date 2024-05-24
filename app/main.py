@@ -6,7 +6,19 @@ from kubernetes import client, config
 from dotenv import load_dotenv
 from pathlib import Path
 
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
+
+def get_logging_level():
+    log_level = os.environ.get("LOG_LEVEL", "INFO")
+    levels = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    return levels.get(log_level, logging.INFO)
+
+logging.basicConfig(format="%(asctime)s %(message)s", level=get_logging_level(), handlers=[logging.StreamHandler()])
 logging.info("Starting hibernate")
 
 local_development = os.environ.get("LOCAL_DEVELOPMENT")
@@ -191,9 +203,14 @@ def get_cloud_provider(cluster_id: str, castai_api_token):
 
 
 def main():
-    cloud = get_cloud_provider(cluster_id, castai_api_token)
+    try:
+        cloud = get_cloud_provider(cluster_id, castai_api_token)
+    except:
+        logging.error("could not detect cloud provider, check API key or network problems")
+        exit(1)
+
     if cloud is None:
-        raise Exception("could not detect cloud provider")
+        raise Exception("could not detect cloud provider, check API key or network problems")
         exit(1)
 
     logging.info("Hibernation input parameters clusterId: %s, cloud: %s, action: %s",
