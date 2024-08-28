@@ -167,13 +167,14 @@ def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_token: str, in
 def get_suitable_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, cloud: str):
     cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_token, instance_type=instance_type)
     for node in sorted(cast_nodes, key=lambda k: k['createdAt']):
-        if cloud == "AKS":  # Azure special case use system node
-            if node["labels"].get("kubernetes.azure.com/mode") == "system":
-                logging.info("Suitable system node found: %s" % node["name"])
+        if node["labels"].get("scheduling.cast.ai/paused-cluster") == "true":
+            if cloud == "AKS":  # Azure special case use system node
+                if node["labels"].get("kubernetes.azure.com/mode") == "system":
+                    logging.info("Suitable system node found: %s" % node["name"])
+                    return node["name"]
+            else:
+                logging.info("Suitable node found: %s" % node["name"])
                 return node["name"]
-        else:
-            logging.info("Suitable node found: %s" % node["name"])
-            return node["name"]
 
 
 def get_castai_nodes(cluster_id, castai_api_token):
