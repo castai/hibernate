@@ -60,19 +60,33 @@ Override default hibernate-node size
 Override default NAMESPACES_TO_KEEP
  - Set the NAMESPACES_TO_KEEP environment variable to override, "opa,istio"" 
 
-Override default "PROTECT_EVICTION_DISABLED" and set to "true" to prevent the removal of removal-disabled nodes from being removed during hibernate. This looks for the `autoscaling.cast.ai/removal-disabled="true"` label on a node and if it exists excludes it from being cordoned and deleted. 
-
-## TODO
- - Auto detect Cloud 
+Override default "PROTECT_EVICTION_DISABLED" and set to "true" to prevent the removal of removal-disabled nodes from being removed during hibernate. This looks for the `autoscaling.cast.ai/removal-disabled="true"` label on a node and if it exists excludes it from being cordoned and deleted.
 
 # Development
 
-Create [aks|eks|gke] K8s cluster 
-- create file hack/aks/tf.vars from example
-- run "make aks"
-- connect to cluster (az/gcloud) / switch kubectl context
+## Create [aks|eks|gke] K8s cluster 
+- create file hack/{cloud}/local.auto.tfvars from example, if already have check cluster name
+- run "make aks|eks|gke" to create cluster
+- connect to cluster (az|gcloud|aws) - or best way go to cluster page in cloud and click connect / switch kubectl contex
 
-Run code locally
+## Run code locally
 - copy cluster_id from console.cast.ai to .env file (example .env.example)
 - uncomment in main.py # local_development = True
+- manually create configMap object
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: castai-hibernate-state
+  namespace: castai-agent
+```
+
 - run end2end tests
+
+## Live test and release
+### should be automated, but this project will be sunset soon
+
+- modify Makefile to change tags, bump version and rename latest to test, build locally container and push to registry, test this version as smoke test
+- merge PR to main
+- change back tag test to latest and push to registry

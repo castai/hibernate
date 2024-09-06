@@ -1,5 +1,3 @@
-import logging
-import os
 from cast_utils import *
 from k8s_utils import *
 from kubernetes import client, config
@@ -50,7 +48,6 @@ ns = "castai-agent"
 configmap_name = "castai-hibernate-state"
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
-spot_fallback = "scheduling.cast.ai/spot-fallback"
 cast_nodeID_label = "provisioner.cast.ai/node-id"
 namespaces_to_keep = [
     "castai-pod-node-lifecycle",
@@ -87,7 +84,7 @@ def handle_suspend(cloud):
         if last_run_dirty(client=k8s_v1, cm=configmap_name, ns=ns):
             raise Exception("Cluster is already paused, but last run was dirty, clean configMap to retry or wait 12h")
         else:
-            time.sleep(300)  # avoid double running
+            time.sleep(360)  # avoid double running
             nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token)
             logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
             logging.info("Cluster is already with disabled autoscaler policies, exiting.")

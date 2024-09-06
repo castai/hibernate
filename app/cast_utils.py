@@ -94,13 +94,11 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         new_node_body["kubernetesLabels"] = {
             "scheduling.cast.ai/paused-cluster": "true",
             "kubernetes.azure.com/mode": "system",
-            "scheduling.cast.ai/spot-fallback": "true",
             "scheduling.cast.ai/spot": "true"
         }
     else:
         new_node_body["kubernetesLabels"] = {
             "scheduling.cast.ai/paused-cluster": "true",
-            "scheduling.cast.ai/spot-fallback": "true",
             "scheduling.cast.ai/spot": "true"
         }
 

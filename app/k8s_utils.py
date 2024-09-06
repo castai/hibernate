@@ -160,7 +160,6 @@ def add_node_taint(client, pause_taint: str, node_name):
         "metadata": {
             "labels": {
                 "scheduling.cast.ai/paused-cluster": "true",
-                "scheduling.cast.ai/spot-fallback": "true",
                 "scheduling.cast.ai/spot": "true"
             }
         }
