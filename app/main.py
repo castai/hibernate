@@ -1,12 +1,22 @@
-import logging
-import os
 from cast_utils import *
 from k8s_utils import *
 from kubernetes import client, config
 from dotenv import load_dotenv
 from pathlib import Path
 
-logging.basicConfig(format="%(asctime)s %(message)s", level=logging.INFO, handlers=[logging.StreamHandler()])
+
+def get_logging_level():
+    log_level = os.environ.get("LOG_LEVEL", "INFO")
+    levels = {
+        'DEBUG': logging.DEBUG,
+        'INFO': logging.INFO,
+        'WARNING': logging.WARNING,
+        'ERROR': logging.ERROR,
+        'CRITICAL': logging.CRITICAL
+    }
+    return levels.get(log_level, logging.INFO)
+
+logging.basicConfig(format="%(asctime)s %(message)s", level=get_logging_level(), handlers=[logging.StreamHandler()])
 logging.info("Starting hibernate")
 
 local_development = os.environ.get("LOCAL_DEVELOPMENT")
@@ -38,7 +48,6 @@ ns = "castai-agent"
 configmap_name = "castai-hibernate-state"
 
 castai_pause_toleration = "scheduling.cast.ai/paused-cluster"
-spot_fallback = "scheduling.cast.ai/spot-fallback"
 cast_nodeID_label = "provisioner.cast.ai/node-id"
 namespaces_to_keep = [
     "castai-pod-node-lifecycle",
@@ -75,7 +84,7 @@ def handle_suspend(cloud):
         if last_run_dirty(client=k8s_v1, cm=configmap_name, ns=ns):
             raise Exception("Cluster is already paused, but last run was dirty, clean configMap to retry or wait 12h")
         else:
-            time.sleep(300)  # avoid double running
+            time.sleep(360)  # avoid double running
             nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token)
             logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
             logging.info("Cluster is already with disabled autoscaler policies, exiting.")
@@ -191,9 +200,14 @@ def get_cloud_provider(cluster_id: str, castai_api_token):
 
 
 def main():
-    cloud = get_cloud_provider(cluster_id, castai_api_token)
+    try:
+        cloud = get_cloud_provider(cluster_id, castai_api_token)
+    except:
+        logging.error("could not detect cloud provider, check API key or network problems")
+        exit(1)
+
     if cloud is None:
-        raise Exception("could not detect cloud provider")
+        raise Exception("could not detect cloud provider, check API key or network problems")
         exit(1)
 
     logging.info("Hibernation input parameters clusterId: %s, cloud: %s, action: %s",
