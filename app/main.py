@@ -34,6 +34,7 @@ else:
 k8s_v1 = client.CoreV1Api()
 k8s_v1_apps = client.AppsV1Api()
 
+castai_api_url = os.environ.get("API_URL", "https://api.cast.ai")
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
 hibernate_node_type_override = os.environ.get("HIBERNATE_NODE")
@@ -70,7 +71,7 @@ cloud_labels = {
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")
-    policy_changed = toggle_autoscaler_top_flag(cluster_id, castai_api_token, True)
+    policy_changed = toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, True)
     if not policy_changed:
         raise Exception("could not enable CAST AI autoscaler.")
 
@@ -78,19 +79,20 @@ def handle_resume():
 
 
 def handle_suspend(cloud):
-    current_policies = get_castai_policy(cluster_id, castai_api_token)
+    current_policies = get_castai_policy(cluster_id, castai_api_url, castai_api_token)
     if current_policies["enabled"] == False:
         logging.info("Cluster is already with disabled autoscaler policies, checking for dirty state.")
         if last_run_dirty(client=k8s_v1, cm=configmap_name, ns=ns):
             raise Exception("Cluster is already paused, but last run was dirty, clean configMap to retry or wait 12h")
         else:
             time.sleep(360)  # avoid double running
-            nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token)
+            nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_url=castai_api_url,
+                                     castai_api_token=castai_api_token)
             logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
             logging.info("Cluster is already with disabled autoscaler policies, exiting.")
             return 0
 
-    toggle_autoscaler_top_flag(cluster_id, castai_api_token, False)
+    toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, False)
 
     my_node_name_id = ""
     if my_node_name:
@@ -102,7 +104,8 @@ def handle_suspend(cloud):
     else:
         hibernate_node_type = instance_type[cloud]
 
-    candidate_node = get_suitable_hibernation_node(cluster_id=cluster_id, castai_api_token=castai_api_token,
+    candidate_node = get_suitable_hibernation_node(cluster_id=cluster_id, castai_api_url=castai_api_url,
+                                                   castai_api_token=castai_api_token,
                                                    instance_type=hibernate_node_type, cloud=cloud)
 
     hibernation_node_id = None
@@ -113,7 +116,7 @@ def handle_suspend(cloud):
                                                                node_name=candidate_node)
 
     if my_node_name_id == hibernation_node_id:
-        node_list_result = get_castai_nodes(cluster_id, castai_api_token)
+        node_list_result = get_castai_nodes(cluster_id, castai_api_url, castai_api_token)
         nodes = []
         for node in node_list_result["items"]:
             if node["state"]["phase"] == "ready":
@@ -125,13 +128,14 @@ def handle_suspend(cloud):
 
     if not hibernation_node_id:
         logging.info("No suitable hibernation node found, should make one")
-        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_token, instance_type=hibernate_node_type,
+        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_url, castai_api_token,
+                                                      instance_type=hibernate_node_type,
                                                       k8s_taint=castai_pause_toleration, cloud=cloud)
 
     if not hibernation_node_id:
         raise Exception("could not create hibernation node")
 
-    node_name = get_castai_node_name_by_id(cluster_id, castai_api_token, hibernation_node_id)
+    node_name = get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, hibernation_node_id)
 
     hibernation_node_status = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
                                                                node_name=node_name)
@@ -162,23 +166,26 @@ def handle_suspend(cloud):
 
     if my_node_name_id and my_node_name_id != hibernation_node_id:
         logging.info("Job pod node id and hibernation node is not the same")
-        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token,
+        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_url=castai_api_url,
+                                  castai_api_token=castai_api_token,
                                   hibernation_node_id=hibernation_node_id,
                                   protect_removal_disabled=protect_removal_disabled, job_node_id=my_node_name_id)
         defer_job_node_deletion = True
     else:
         logging.info("Delete all nodes except hibernation node")
-        delete_all_pausable_nodes(cluster_id, castai_api_token, hibernation_node_id, protect_removal_disabled)
+        delete_all_pausable_nodes(cluster_id, castai_api_url, castai_api_token, hibernation_node_id,
+                                  protect_removal_disabled)
 
     remove_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_id=hibernation_node_id)
 
     if defer_job_node_deletion:
         logging.info("Delete jobs node with id %s:", my_node_name_id)
-        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_token=castai_api_token,
+        delete_all_pausable_nodes(cluster_id=cluster_id, castai_api_url=castai_api_url,
+                                  castai_api_token=castai_api_token,
                                   hibernation_node_id=hibernation_node_id,
                                   protect_removal_disabled=protect_removal_disabled)
 
-    if cluster_ready(clusterid=cluster_id, castai_apitoken=castai_api_token):
+    if cluster_ready(clusterid=cluster_id, castai_api_url=castai_api_url, castai_api_token=castai_api_token):
         logging.info(f"cluster ready, updating last run status to success.")
         update_last_run_status(client=k8s_v1, cm=configmap_name, ns=ns, status="success")
         logging.info("Pause operation completed.")
@@ -187,10 +194,10 @@ def handle_suspend(cloud):
         raise Exception("Pause finished, but cluster is not ready")
 
 
-def get_cloud_provider(cluster_id: str, castai_api_token):
+def get_cloud_provider(cluster_id: str, castai_api_url: str, castai_api_token: str):
     '''Detect cloud provider from CAST AI, then node labels or fallback to env var CLOUD'''
 
-    cloud_var = get_cluster_details(cluster_id, castai_api_token)["providerType"].upper()
+    cloud_var = get_cluster_details(cluster_id, castai_api_url, castai_api_token)["providerType"].upper()
     if cloud_var is not None:
         logging.info(f"Cloud %s auto-detected from CAST AI cluster details API", cloud_var)
         return cloud_var
@@ -201,7 +208,7 @@ def get_cloud_provider(cluster_id: str, castai_api_token):
 
 def main():
     try:
-        cloud = get_cloud_provider(cluster_id, castai_api_token)
+        cloud = get_cloud_provider(cluster_id, castai_api_url, castai_api_token)
     except:
         logging.error("could not detect cloud provider, check API key or network problems")
         exit(1)
