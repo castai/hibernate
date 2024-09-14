@@ -185,7 +185,7 @@ def handle_suspend(cloud):
                                   hibernation_node_id=hibernation_node_id,
                                   protect_removal_disabled=protect_removal_disabled)
 
-    if cluster_ready(clusterid=cluster_id, castai_api_url=castai_api_url, castai_api_token=castai_api_token):
+    if cluster_ready(cluster_id=cluster_id, castai_api_url=castai_api_url, castai_api_token=castai_api_token):
         logging.info(f"cluster ready, updating last run status to success.")
         update_last_run_status(client=k8s_v1, cm=configmap_name, ns=ns, status="success")
         logging.info("Pause operation completed.")
