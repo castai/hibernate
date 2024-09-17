@@ -10,50 +10,50 @@ class NetworkError(Exception):
 
 
 @basic_retry(attempts=3, pause=5)
-def get_cluster_status(clusterid, castai_apitoken):
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}".format
+def get_cluster_status(cluster_id, castai_api_url, castai_api_token):
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}"
     header_dict = {"accept": "application/json",
-                   "X-API-Key": castai_apitoken}
+                   "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(clusterid), headers=header_dict)
+    resp = requests.get(url, headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
 
 
 @basic_retry(attempts=3, pause=5)
-def cluster_ready(clusterid, castai_apitoken):
-    cluster = get_cluster_status(clusterid, castai_apitoken)
+def cluster_ready(cluster_id, castai_api_url, castai_api_token):
+    cluster = get_cluster_status(cluster_id, castai_api_url, castai_api_token)
     logging.info(f"TEST cluster status: {cluster.get('status')}, id: {cluster.get('id')}")
     if cluster.get('status') == 'ready':
         return True
     return False
 
 
-def get_castai_policy(cluster_id, castai_api_token):
-    url = "https://api.cast.ai/v1/kubernetes/clusters/{}/policies".format
+def get_castai_policy(cluster_id, castai_api_url, castai_api_token):
+    url = f"{castai_api_url}/v1/kubernetes/clusters/{cluster_id}/policies"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(cluster_id), headers=header_dict)
+    resp = requests.get(url, headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
 
 
-def set_castai_policy(cluster_id, castai_api_token, updated_policies):
-    url = "https://api.cast.ai/v1/kubernetes/clusters/{}/policies".format
+def set_castai_policy(cluster_id, castai_api_url, castai_api_token, updated_policies):
+    url = f"{castai_api_url}/v1/kubernetes/clusters/{cluster_id}/policies"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-    resp = requests.put(url=url(cluster_id), json=updated_policies, headers=header_dict)
+    resp = requests.put(url, json=updated_policies, headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
 
 
 @basic_retry(attempts=2, pause=5)
-def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_value: bool):
+def toggle_autoscaler_top_flag(cluster_id: str, castai_api_url: str, castai_api_token: str, policy_value: bool):
     """" Disable CAST autoscaler to prevent adding new nodes automatically"""
 
-    current_policies = get_castai_policy(cluster_id, castai_api_token)
+    current_policies = get_castai_policy(cluster_id, castai_api_url, castai_api_token)
 
     if current_policies["enabled"] != policy_value:
         logging.info("Update policy. mismatch")
@@ -61,7 +61,7 @@ def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_va
 
         current_policies["enabled"] = policy_value
 
-        validate_policies = set_castai_policy(cluster_id, castai_api_token, current_policies)
+        validate_policies = set_castai_policy(cluster_id, castai_api_url, castai_api_token, current_policies)
         if validate_policies["enabled"] == policy_value:
             logging.info("Update completed")
             return True
@@ -74,9 +74,10 @@ def toggle_autoscaler_top_flag(cluster_id: str, castai_api_token: str, policy_va
 
 
 @basic_retry(attempts=3, pause=5)
-def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, k8s_taint: str, cloud: str):
+def create_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_token: str, instance_type: str,
+                            k8s_taint: str, cloud: str):
     """ Create Node with Taint that will stay running during hibernation"""
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}/nodes"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
@@ -104,7 +105,7 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
 
     with Session() as session:
         try:
-            with session.post(url=url(cluster_id), json=new_node_body, headers=header_dict) as postresp:
+            with session.post(url, json=new_node_body, headers=header_dict) as postresp:
                 postresp.raise_for_status()
                 add_node_result = postresp.json()
         except Exception as e:
@@ -113,13 +114,13 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
         # wait for new node to be created, listen to operation
         ops_id = add_node_result["operationId"]
         nodeId = add_node_result["nodeId"]
-        urlOperations = "https://api.cast.ai/v1/kubernetes/external-clusters/operations/{}".format
+        urlOperations = f"{castai_api_url}/v1/kubernetes/external-clusters/operations/{ops_id}"
         done_node_creation = False
 
         while not done_node_creation:
             logging.info("checking node creation operation ID: %s", ops_id)
             try:
-                with session.get(url=urlOperations(ops_id), headers=header_dict) as operation:
+                with session.get(urlOperations, headers=header_dict) as operation:
                     operation.raise_for_status()
                     ops_response = operation.json()
             except Exception as e:
@@ -135,10 +136,10 @@ def create_hibernation_node(cluster_id: str, castai_api_token: str, instance_typ
 
 
 @basic_retry(attempts=4, pause=15)
-def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernation_node_id: str,
+def delete_all_pausable_nodes(cluster_id: str, castai_api_url: str, castai_api_token: str, hibernation_node_id: str,
                               protect_removal_disabled: str, job_node_id=None):
     """" Delete all nodes through CAST AI mothership excluding hibernation node"""
-    node_list_result = get_castai_nodes(cluster_id, castai_api_token)
+    node_list_result = get_castai_nodes(cluster_id, castai_api_url, castai_api_token)
     for node in node_list_result["items"]:
         # drain/delete each node
         if node["id"] == hibernation_node_id or node["id"] == job_node_id:
@@ -148,12 +149,12 @@ def delete_all_pausable_nodes(cluster_id: str, castai_api_token: str, hibernatio
             logging.info("Skipping node protected by removal-disabled ID: %s " % node["id"])
             continue
         logging.info("Deleting: %s with id: %s" % (node["name"], node["id"]))
-        delete_castai_node(cluster_id, castai_api_token, node["id"])
+        delete_castai_node(cluster_id, castai_api_url, castai_api_token, node["id"])
 
 
-def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_token: str, instance_type: str):
+def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_url: str, castai_api_token: str, instance_type: str):
     """" Get all nodes by instance type"""
-    node_list_result = get_castai_nodes(cluster_id, castai_api_token)
+    node_list_result = get_castai_nodes(cluster_id, castai_api_url, castai_api_token)
     nodes = []
     for node in node_list_result["items"]:
         if node["instanceType"] == instance_type and node["state"]["phase"] == "ready":
@@ -162,8 +163,10 @@ def get_castai_nodes_by_instance_type(cluster_id: str, castai_api_token: str, in
     return nodes
 
 
-def get_suitable_hibernation_node(cluster_id: str, castai_api_token: str, instance_type: str, cloud: str):
-    cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_token, instance_type=instance_type)
+def get_suitable_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_token: str, instance_type: str,
+                                  cloud: str):
+    cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_url, castai_api_token,
+                                                   instance_type=instance_type)
     for node in sorted(cast_nodes, key=lambda k: k['createdAt']):
         if node["labels"].get("scheduling.cast.ai/paused-cluster") == "true":
             if cloud == "AKS":  # Azure special case use system node
@@ -175,24 +178,24 @@ def get_suitable_hibernation_node(cluster_id: str, castai_api_token: str, instan
                 return node["name"]
 
 
-def get_castai_nodes(cluster_id, castai_api_token):
+def get_castai_nodes(cluster_id, castai_api_url, castai_api_token):
     """ Get all nodes from CAST AI API inside the cluster"""
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes".format
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}/nodes"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(cluster_id), headers=header_dict)
+    resp = requests.get(url, headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
 
 
-def get_castai_node_name_by_id(cluster_id, castai_api_token, node_id):
+def get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, node_id):
     """ Get node by CAST AI id from CAST AI API"""
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}/nodes/{node_id}"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(cluster_id, node_id), headers=header_dict)
+    resp = requests.get(url, headers=header_dict)
     if resp.status_code == 200:
         if resp.json()['name']:
             return resp.json()['name']
@@ -201,9 +204,9 @@ def get_castai_node_name_by_id(cluster_id, castai_api_token, node_id):
 
 
 @basic_retry(attempts=3, pause=30)
-def delete_castai_node(cluster_id, castai_api_token, node_id):
+def delete_castai_node(cluster_id, castai_api_url, castai_api_token, node_id):
     """ Delete single node"""
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}/nodes/{}".format
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}/nodes/{node_id}"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
     paramsDelete = {
@@ -211,7 +214,7 @@ def delete_castai_node(cluster_id, castai_api_token, node_id):
         "drainTimeout": 60
     }
 
-    resp = requests.delete(url=url(cluster_id, node_id), headers=header_dict, params=paramsDelete)
+    resp = requests.delete(url, headers=header_dict, params=paramsDelete)
     if resp.status_code == 200:
         delete_node_result = resp.json()
         logging.info(delete_node_result)
@@ -220,11 +223,11 @@ def delete_castai_node(cluster_id, castai_api_token, node_id):
         return False
 
 
-def get_cluster_details(cluster_id, castai_api_token):
-    url = "https://api.cast.ai/v1/kubernetes/external-clusters/{}".format
+def get_cluster_details(cluster_id, castai_api_url, castai_api_token):
+    url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}"
     header_dict = {"accept": "application/json",
                    "X-API-Key": castai_api_token}
 
-    resp = requests.get(url=url(cluster_id), headers=header_dict)
+    resp = requests.get(url, headers=header_dict)
     if resp.status_code == 200:
         return resp.json()
