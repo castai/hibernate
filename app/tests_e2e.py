@@ -34,7 +34,7 @@ class Scenario:
 
     @step
     def validate_labels(self):
-        '''compare if hibernate_node_labels keys are on the node'''
+        '''compare if hibernate_node_labels key are on the node labes'''
         node = get_castai_nodes(self.cluster_id, self.castai_api_token)
         logging.info(f"TEST node labels: {node['items'][0]['metadata']['labels']}")
         if hibernate_node_labels:
@@ -82,18 +82,18 @@ class Scenario:
         assert current_policies["enabled"], "Policy not enabled after resume"
 
 
-# def test_all():
-#     logging.info("TEST test started")
-#     scenario = Scenario(cluster_id, castai_api_token, ns, configmap_name, k8s_v1)
-#     scenario.cluster_is_ready()
-#     scenario.get_cloud()
-#     scenario.configmap_read()
-#     scenario.suspend()
-#     scenario.validate_labels()
-#     time.sleep(15)
-#     scenario.double_suspend()
-#     scenario.cluster_is_ready()
-#     time.sleep(15)
-#     scenario.resume()
-#     scenario.cluster_is_ready()
-#     logging.info("TEST test finished")
+def test_all():
+    logging.info("TEST test started")
+    scenario = Scenario(cluster_id, castai_api_token, ns, configmap_name, k8s_v1)
+    scenario.cluster_is_ready()
+    scenario.get_cloud()
+    scenario.configmap_read()
+    scenario.suspend()
+    scenario.validate_labels()
+    time.sleep(15)
+    scenario.double_suspend()
+    scenario.cluster_is_ready()
+    time.sleep(15)
+    scenario.resume()
+    scenario.cluster_is_ready()
+    logging.info("TEST test finished")
