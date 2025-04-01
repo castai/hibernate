@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM python:3.10-slim
 
 ENV PATH /usr/local/bin:$PATH
 
@@ -10,6 +10,6 @@ WORKDIR /app
 
 RUN pip install --disable-pip-version-check poetry
 RUN poetry config virtualenvs.create false
-RUN poetry install --no-root --no-dev --no-interaction --no-ansi
+RUN poetry install --without dev --no-root --no-interaction --no-ansi
 
 CMD ["python", "main.py"]

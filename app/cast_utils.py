@@ -1,6 +1,6 @@
 import logging
 import time
-from utils import basic_retry
+from utils import basic_retry, parse_labels
 import requests
 from requests import Session
 
@@ -75,7 +75,7 @@ def toggle_autoscaler_top_flag(cluster_id: str, castai_api_url: str, castai_api_
 
 @basic_retry(attempts=3, pause=5)
 def create_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_token: str, instance_type: str,
-                            k8s_taint: str, cloud: str):
+                            k8s_taint: str, labels: str, cloud: str):
     """ Create Node with Taint that will stay running during hibernation"""
     url = f"{castai_api_url}/v1/kubernetes/external-clusters/{cluster_id}/nodes"
     header_dict = {"accept": "application/json",
@@ -84,6 +84,7 @@ def create_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_tok
     add_node_result = ""
     new_node_body = {}
     new_node_body["instanceType"] = instance_type
+
     if k8s_taint:
         special_taint = [{
             "effect": "NoSchedule",
@@ -91,6 +92,7 @@ def create_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_tok
             "value": "true"
         }]
         new_node_body["kubernetesTaints"] = special_taint
+
     if cloud == "AKS":
         new_node_body["kubernetesLabels"] = {
             "scheduling.cast.ai/paused-cluster": "true",
@@ -102,6 +104,16 @@ def create_hibernation_node(cluster_id: str, castai_api_url: str, castai_api_tok
             "scheduling.cast.ai/paused-cluster": "true",
             "scheduling.cast.ai/spot": "true"
         }
+
+    if labels:
+        parsed_labels = parse_labels(labels)
+        logging.info(f'Custom labels to add : {parsed_labels}')
+        if isinstance(parsed_labels, dict):
+            new_node_body["kubernetesLabels"].update(parsed_labels)
+        else:
+            logging.warning("create_hibernation_node: Parsed labels is not a valid dictionary")
+
+    logging.debug(f'add node body for CAST AI api: {new_node_body}')
 
     with Session() as session:
         try:
@@ -168,7 +180,9 @@ def get_suitable_hibernation_node(cluster_id: str, castai_api_url: str, castai_a
     cast_nodes = get_castai_nodes_by_instance_type(cluster_id, castai_api_url, castai_api_token,
                                                    instance_type=instance_type)
     for node in sorted(cast_nodes, key=lambda k: k['createdAt']):
-        if node["labels"].get("scheduling.cast.ai/paused-cluster") == "true":
+        if (node["labels"].get("scheduling.cast.ai/paused-cluster") == "true" and
+                node["labels"].get("scheduling.cast.ai/on-demand") == "true"):
+
             if cloud == "AKS":  # Azure special case use system node
                 if node["labels"].get("kubernetes.azure.com/mode") == "system":
                     logging.info("Suitable system node found: %s" % node["name"])

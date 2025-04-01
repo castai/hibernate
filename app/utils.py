@@ -35,3 +35,18 @@ def failure_logging(f):
             raise err
 
     return wrapper
+
+def parse_labels(labels: str) -> dict:
+    """Parse and validate labels from a string"""
+    label_dict = {}
+    for label in labels.split(","):
+        key_value = label.split("=")
+        if len(key_value) == 2:
+            key, value = key_value
+            key = key.strip()
+            if key in label_dict:
+                logging.warning(f"Duplicate key detected: {key}")
+            label_dict[key] = value.strip()
+        else:
+            logging.warning(f"Invalid label format: {label}")
+    return label_dict
