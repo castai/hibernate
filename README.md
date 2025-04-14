@@ -68,6 +68,9 @@ Hibernate-resume Job will
 Override default hibernate-node size
  - Set the HIBERNATE_NODE environment variable to override the default node sizing selections. Make sure the size selected is appropriate for your cloud. 
 
+Set kubernetes labels on hibernate-node, if CASTAI components and other kube-system workloads for wrong reasons have nodeSelector 
+ - HIBERNATE_NODE_LABELS, comma separated list, do not use duplicate keys, "imaginary.devops/requirements=true, acme.io/infra=true"
+
 Override default NAMESPACES_TO_KEEP
  - Set the NAMESPACES_TO_KEEP environment variable to override, "opa,istio"" 
 

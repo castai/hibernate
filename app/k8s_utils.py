@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from utils import basic_retry
+from utils import basic_retry, parse_labels
 from kubernetes.client.rest import ApiException
 from kubernetes import client as rawclient
 
@@ -140,12 +140,12 @@ def node_has_unexpected_taint(client, valid_taint_key: str, node_name: str):
 
 
 @basic_retry(attempts=2, pause=5)
-def add_node_taint(client, pause_taint: str, node_name):
+def add_node_taint(client, node_name, pause_taint: str, labels: str):
     """ add specific taint to node"""
     logging.info(f'patching node {node_name} to add {pause_taint} taint')
 
-    k8s_label = "kubernetes.io/hostname=" + node_name
-    node = client.list_node(label_selector=k8s_label).items[0]
+    node_name_label = "kubernetes.io/hostname=" + node_name
+    node = client.list_node(label_selector=node_name_label).items[0]
 
     taint_to_add = {"key": pause_taint, "effect": "NoSchedule"}
     current_taints = node.spec.taints
@@ -168,6 +168,13 @@ def add_node_taint(client, pause_taint: str, node_name):
             }
         }
     }
+
+    if labels:
+        parsed_labels = parse_labels(labels)
+        if isinstance(parsed_labels, dict):
+            taint_body["metadata"]["labels"].update(parsed_labels)
+        else:
+            logging.warning("add_node_taint: Parsed labels is not a valid dictionary")
 
     try:
         patch_result = client.patch_node(node.metadata.name, taint_body)
@@ -205,8 +212,8 @@ def remove_node_taint(client, pause_taint: str, node_id: str):
 @basic_retry(attempts=3, pause=15)
 def get_node_castai_id(client, node_name: str):
     """" Node with hibernation taint already exist """
-    k8s_label = "kubernetes.io/hostname=" + node_name
-    node_list = client.list_node(label_selector=k8s_label)
+    node_name_label = "kubernetes.io/hostname=" + node_name
+    node_list = client.list_node(label_selector=node_name_label)
     if len(node_list.items) == 1:
         for node in node_list.items:
             node_id = node.metadata.labels.get("provisioner.cast.ai/node-id")

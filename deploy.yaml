@@ -158,6 +158,8 @@ spec:
                     fieldPath: spec.nodeName
               - name: HIBERNATE_NODE
                 value: ""
+              - name: HIBERNATE_NODE_LABELS
+                value: ""
               - name: NAMESPACES_TO_KEEP
                 value: ""
               - name: PROTECT_REMOVAL_DISABLED

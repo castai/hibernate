@@ -38,6 +38,7 @@ castai_api_url = os.environ.get("API_URL", "https://api.cast.ai")
 castai_api_token = os.environ["API_KEY"]
 cluster_id = os.environ["CLUSTER_ID"]
 hibernate_node_type_override = os.environ.get("HIBERNATE_NODE")
+hibernate_node_labels = os.environ.get("HIBERNATE_NODE_LABELS")
 
 action = os.environ["ACTION"]
 user_namespaces_to_keep = os.environ.get("NAMESPACES_TO_KEEP")
@@ -111,7 +112,9 @@ def handle_suspend(cloud):
     hibernation_node_id = None
     if candidate_node:
         logging.info("Found suitable hibernation candidate node: %s", candidate_node)
-        add_node_taint(client=k8s_v1, pause_taint=castai_pause_toleration, node_name=candidate_node)
+        add_node_taint(client=k8s_v1, node_name=candidate_node,
+                       pause_taint=castai_pause_toleration,
+                       labels=hibernate_node_labels)
         hibernation_node_id = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
                                                                node_name=candidate_node)
 
@@ -130,7 +133,9 @@ def handle_suspend(cloud):
         logging.info("No suitable hibernation node found, should make one")
         hibernation_node_id = create_hibernation_node(cluster_id, castai_api_url, castai_api_token,
                                                       instance_type=hibernate_node_type,
-                                                      k8s_taint=castai_pause_toleration, cloud=cloud)
+                                                      k8s_taint=castai_pause_toleration,
+                                                      labels=hibernate_node_labels,
+                                                      cloud=cloud)
 
     if not hibernation_node_id:
         raise Exception("could not create hibernation node")

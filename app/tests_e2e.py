@@ -1,11 +1,12 @@
 import logging
 import sys
 import time
+
 from main import handle_suspend, handle_resume, get_cloud_provider, cluster_id, castai_api_token, ns, configmap_name, \
-    k8s_v1
+    k8s_v1, hibernate_node_labels
 from cast_utils import get_cluster_status, get_castai_nodes, get_castai_policy
 from k8s_utils import read_configMap
-from utils import step
+from utils import step, parse_labels
 
 logger = logging.getLogger()
 logger.setLevel(level=logging.INFO)
@@ -30,6 +31,17 @@ class Scenario:
         cluster = get_cluster_status(self.cluster_id, self.castai_api_token)
         logging.info(f"TEST cluster status: {cluster.get('status')}, id: {cluster.get('id')}")
         assert cluster.get('status') == 'ready', "Cluster is not ready"
+
+    @step
+    def validate_labels(self):
+        '''compare if hibernate_node_labels key are on the node labes'''
+        node = get_castai_nodes(self.cluster_id, self.castai_api_token)
+        logging.info(f"TEST node labels: {node['items'][0]['metadata']['labels']}")
+        if hibernate_node_labels:
+            parsed_labels = parse_labels(hibernate_node_labels)
+            if isinstance(parsed_labels, dict):
+                for k, v in parsed_labels.items():
+                    assert k in node['items'][0]['metadata']['labels'], f"Label key {k} not found on node"
 
     @step
     def get_cloud(self):
@@ -77,6 +89,7 @@ def test_all():
     scenario.get_cloud()
     scenario.configmap_read()
     scenario.suspend()
+    scenario.validate_labels()
     time.sleep(15)
     scenario.double_suspend()
     scenario.cluster_is_ready()
