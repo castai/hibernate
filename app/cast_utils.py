@@ -17,6 +17,8 @@ def get_cluster_status(cluster_id, castai_api_url, castai_api_token):
 
     resp = requests.get(url, headers=header_dict)
     resp.raise_for_status()
+    if not resp.content:
+        return {}
     return resp.json()
 
 
@@ -36,6 +38,8 @@ def get_castai_policy(cluster_id, castai_api_url, castai_api_token):
 
     resp = requests.get(url, headers=header_dict)
     resp.raise_for_status()
+    if not resp.content:
+        return {}
     return resp.json()
 
 
@@ -46,6 +50,8 @@ def set_castai_policy(cluster_id, castai_api_url, castai_api_token, updated_poli
 
     resp = requests.put(url, json=updated_policies, headers=header_dict)
     resp.raise_for_status()
+    if not resp.content:
+        return {}
     return resp.json()
 
 
@@ -200,6 +206,8 @@ def get_castai_nodes(cluster_id, castai_api_url, castai_api_token):
 
     resp = requests.get(url, headers=header_dict)
     resp.raise_for_status()
+    if not resp.content:
+        return {"items": []}
     return resp.json()
 
 
@@ -211,9 +219,13 @@ def get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, nod
 
     resp = requests.get(url, headers=header_dict)
     resp.raise_for_status()
+    # Handle 204 No Content or empty responses
+    if not resp.content:
+        return False
     data = resp.json()
-    if data['name']:
-        return data['name']
+    name = data.get('name')
+    if name:
+        return name
     return False
 
 
@@ -230,8 +242,12 @@ def delete_castai_node(cluster_id, castai_api_url, castai_api_token, node_id):
 
     resp = requests.delete(url, headers=header_dict, params=paramsDelete)
     resp.raise_for_status()
-    delete_node_result = resp.json()
-    logging.info(delete_node_result)
+    # DELETE may return 204 No Content with empty body
+    if resp.content:
+        delete_node_result = resp.json()
+        logging.info(delete_node_result)
+    else:
+        logging.info(f"Node {node_id} deleted successfully (204 No Content)")
     return True
 
 
@@ -242,4 +258,6 @@ def get_cluster_details(cluster_id, castai_api_url, castai_api_token):
 
     resp = requests.get(url, headers=header_dict)
     resp.raise_for_status()
+    if not resp.content:
+        return {}
     return resp.json()
