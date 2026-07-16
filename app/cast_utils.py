@@ -16,8 +16,8 @@ def get_cluster_status(cluster_id, castai_api_url, castai_api_token):
                    "X-API-Key": castai_api_token}
 
     resp = requests.get(url, headers=header_dict)
-    if resp.status_code == 200:
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
 
 
 @basic_retry(attempts=3, pause=5)
@@ -35,8 +35,8 @@ def get_castai_policy(cluster_id, castai_api_url, castai_api_token):
                    "X-API-Key": castai_api_token}
 
     resp = requests.get(url, headers=header_dict)
-    if resp.status_code == 200:
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
 
 
 def set_castai_policy(cluster_id, castai_api_url, castai_api_token, updated_policies):
@@ -45,8 +45,8 @@ def set_castai_policy(cluster_id, castai_api_url, castai_api_token, updated_poli
                    "X-API-Key": castai_api_token}
 
     resp = requests.put(url, json=updated_policies, headers=header_dict)
-    if resp.status_code == 200:
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
 
 
 @basic_retry(attempts=2, pause=5)
@@ -199,8 +199,8 @@ def get_castai_nodes(cluster_id, castai_api_url, castai_api_token):
                    "X-API-Key": castai_api_token}
 
     resp = requests.get(url, headers=header_dict)
-    if resp.status_code == 200:
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
 
 
 def get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, node_id):
@@ -210,11 +210,11 @@ def get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, nod
                    "X-API-Key": castai_api_token}
 
     resp = requests.get(url, headers=header_dict)
-    if resp.status_code == 200:
-        if resp.json()['name']:
-            return resp.json()['name']
-        else:
-            return False
+    resp.raise_for_status()
+    data = resp.json()
+    if data['name']:
+        return data['name']
+    return False
 
 
 @basic_retry(attempts=3, pause=30)
@@ -229,12 +229,10 @@ def delete_castai_node(cluster_id, castai_api_url, castai_api_token, node_id):
     }
 
     resp = requests.delete(url, headers=header_dict, params=paramsDelete)
-    if resp.status_code == 200:
-        delete_node_result = resp.json()
-        logging.info(delete_node_result)
-        return True
-    else:
-        return False
+    resp.raise_for_status()
+    delete_node_result = resp.json()
+    logging.info(delete_node_result)
+    return True
 
 
 def get_cluster_details(cluster_id, castai_api_url, castai_api_token):
@@ -243,5 +241,5 @@ def get_cluster_details(cluster_id, castai_api_url, castai_api_token):
                    "X-API-Key": castai_api_token}
 
     resp = requests.get(url, headers=header_dict)
-    if resp.status_code == 200:
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
