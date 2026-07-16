@@ -3,6 +3,10 @@ from k8s_utils import *
 from kubernetes import client, config
 from dotenv import load_dotenv
 from pathlib import Path
+import os
+import time
+import logging
+import requests
 
 
 def get_logging_level():
@@ -72,7 +76,11 @@ cloud_labels = {
 
 def handle_resume():
     logging.info("Resuming cluster, autoscaling will be enabled")
-    policy_changed = toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, True)
+    try:
+        policy_changed = toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, True)
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to enable autoscaler: {e}")
+        raise
     if not policy_changed:
         raise Exception("could not enable CAST AI autoscaler.")
 
@@ -80,20 +88,32 @@ def handle_resume():
 
 
 def handle_suspend(cloud):
-    current_policies = get_castai_policy(cluster_id, castai_api_url, castai_api_token)
-    if current_policies["enabled"] == False:
+    try:
+        current_policies = get_castai_policy(cluster_id, castai_api_url, castai_api_token)
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to get CAST AI policy: {e}")
+        raise
+    if current_policies.get("enabled") == False:
         logging.info("Cluster is already with disabled autoscaler policies, checking for dirty state.")
         if last_run_dirty(client=k8s_v1, cm=configmap_name, ns=ns):
             raise Exception("Cluster is already paused, but last run was dirty, clean configMap to retry or wait 12h")
         else:
             time.sleep(360)  # avoid double running
-            nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_url=castai_api_url,
-                                     castai_api_token=castai_api_token)
-            logging.info(f'Number of nodes found in the cluster: {len(nodes["items"])}')
+            try:
+                nodes = get_castai_nodes(cluster_id=cluster_id, castai_api_url=castai_api_url,
+                                         castai_api_token=castai_api_token)
+            except requests.exceptions.HTTPError as e:
+                logging.error(f"Failed to get CAST AI nodes: {e}")
+                raise
+            logging.info(f'Number of nodes found in the cluster: {len(nodes.get("items", []))}')
             logging.info("Cluster is already with disabled autoscaler policies, exiting.")
             return 0
 
-    toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, False)
+    try:
+        toggle_autoscaler_top_flag(cluster_id, castai_api_url, castai_api_token, False)
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to disable autoscaler: {e}")
+        raise
 
     my_node_name_id = ""
     if my_node_name:
@@ -119,9 +139,13 @@ def handle_suspend(cloud):
                                                                node_name=candidate_node)
 
     if my_node_name_id == hibernation_node_id:
-        node_list_result = get_castai_nodes(cluster_id, castai_api_url, castai_api_token)
+        try:
+            node_list_result = get_castai_nodes(cluster_id, castai_api_url, castai_api_token)
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"Failed to get CAST AI nodes: {e}")
+            raise
         nodes = []
-        for node in node_list_result["items"]:
+        for node in node_list_result.get("items", []):
             if node["state"]["phase"] == "ready":
                 nodes.append(node)
         logging.info(f'Number of READY nodes found in the cluster: {len(nodes)}')
@@ -131,16 +155,24 @@ def handle_suspend(cloud):
 
     if not hibernation_node_id:
         logging.info("No suitable hibernation node found, should make one")
-        hibernation_node_id = create_hibernation_node(cluster_id, castai_api_url, castai_api_token,
-                                                      instance_type=hibernate_node_type,
-                                                      k8s_taint=castai_pause_toleration,
-                                                      labels=hibernate_node_labels,
-                                                      cloud=cloud)
+        try:
+            hibernation_node_id = create_hibernation_node(cluster_id, castai_api_url, castai_api_token,
+                                                          instance_type=hibernate_node_type,
+                                                          k8s_taint=castai_pause_toleration,
+                                                          labels=hibernate_node_labels,
+                                                          cloud=cloud)
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"Failed to create hibernation node: {e}")
+            raise
 
     if not hibernation_node_id:
         raise Exception("could not create hibernation node")
 
-    node_name = get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, hibernation_node_id)
+    try:
+        node_name = get_castai_node_name_by_id(cluster_id, castai_api_url, castai_api_token, hibernation_node_id)
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to get node name by ID: {e}")
+        raise
 
     hibernation_node_status = check_hibernation_node_readiness(client=k8s_v1, taint=castai_pause_toleration,
                                                                node_name=node_name)
@@ -202,8 +234,13 @@ def handle_suspend(cloud):
 def get_cloud_provider(cluster_id: str, castai_api_url: str, castai_api_token: str):
     '''Detect cloud provider from CAST AI, then node labels or fallback to env var CLOUD'''
 
-    cloud_var = get_cluster_details(cluster_id, castai_api_url, castai_api_token)["providerType"].upper()
-    if cloud_var is not None:
+    try:
+        cluster_details = get_cluster_details(cluster_id, castai_api_url, castai_api_token)
+        cloud_var = cluster_details.get("providerType", "").upper()
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"Failed to get cluster details: {e}")
+        raise
+    if cloud_var:
         logging.info(f"Cloud %s auto-detected from CAST AI cluster details API", cloud_var)
         return cloud_var
 
@@ -214,8 +251,11 @@ def get_cloud_provider(cluster_id: str, castai_api_url: str, castai_api_token: s
 def main():
     try:
         cloud = get_cloud_provider(cluster_id, castai_api_url, castai_api_token)
-    except:
+    except requests.exceptions.HTTPError:
         logging.error("could not detect cloud provider, check API key or network problems")
+        exit(1)
+    except Exception:
+        logging.error("unexpected error detecting cloud provider")
         exit(1)
 
     if cloud is None:

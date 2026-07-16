@@ -1,7 +1,7 @@
 import functools
 import logging
-
-from tenacity import retry, wait_fixed, stop_after_attempt, before_log
+import requests
+from tenacity import retry, wait_fixed, stop_after_attempt, before_log, retry_if_exception_type
 
 
 def step(f):
@@ -16,10 +16,30 @@ def step(f):
     return wrapper
 
 
+def _is_retryable_error(exc: BaseException) -> bool:
+    """Return True only for transient errors worth retrying."""
+    if isinstance(exc, requests.exceptions.Timeout):
+        return True
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return True
+    if isinstance(exc, requests.exceptions.HTTPError):
+        # Retry on 5xx server errors, but fail fast on 4xx client errors
+        resp = exc.response
+        if resp is not None and 500 <= resp.status_code < 600:
+            return True
+        return False
+    return False
+
+
 def basic_retry(attempts, pause):
     def decorator_chain(f):
         f = failure_logging(f)
-        f = retry(wait=wait_fixed(pause), stop=stop_after_attempt(attempts), before=before_log(logging, logging.INFO))(f)
+        f = retry(
+            wait=wait_fixed(pause),
+            stop=stop_after_attempt(attempts),
+            before=before_log(logging, logging.INFO),
+            retry=retry_if_exception_type(_is_retryable_error),
+        )(f)
         return f
 
     return decorator_chain
